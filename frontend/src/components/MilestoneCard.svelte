@@ -149,7 +149,7 @@
     {/if}
     {#if role === "freelancer" && (m.status === "funded" || m.status === "failed")}
       <ActionButton anyBusy={busy} working={myBusy} workingLabel="Submitting" onclick={() => onSubmit(contract.id, m.id)}>
-        Submit deliverable
+        Submit the deliverable for examination
       </ActionButton>
     {/if}
     {#if m.status === "submitted"}
@@ -455,6 +455,85 @@
   @media (max-width: 720px) {
     .ms-head {
       flex-wrap: wrap;
+    }
+    .ms-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    /* Examination table reflows into one stacked block per criterion
+       (§13 rule 4) — reflowed, never squeezed. The header row is
+       visually hidden but remains available to assistive tech. */
+    .exam-wrap {
+      overflow-x: visible;
+    }
+    table.exam {
+      min-width: 0;
+    }
+    table.exam thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    table.exam tbody,
+    table.exam tr,
+    table.exam td {
+      display: block;
+      width: 100%;
+    }
+    table.exam tr {
+      display: grid;
+      grid-template-columns: 36px 1fr auto;
+      grid-template-areas:
+        "no crit crit"
+        "no wt find"
+        "no ev ev";
+      column-gap: 8px;
+      padding: 15px 0 13px;
+      border-bottom: 1px solid var(--rule);
+    }
+    table.exam td {
+      border-bottom: none;
+      padding: 2px 0;
+    }
+    td.no {
+      grid-area: no;
+      width: auto;
+      font-size: 19px;
+    }
+    td.crit {
+      grid-area: crit;
+      width: auto;
+    }
+    td.crit .c {
+      font-size: 18px;
+    }
+    td.wt {
+      grid-area: wt;
+      width: auto;
+      font-size: 17px;
+      align-self: baseline;
+    }
+    td.wt::after {
+      content: " weight";
+      font-size: 10.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--faint);
+      font-weight: 500;
+    }
+    td.find {
+      grid-area: find;
+      width: auto;
+      text-align: right;
+      align-self: baseline;
+    }
+    td.ev {
+      grid-area: ev;
+      margin-top: 5px;
     }
   }
 </style>

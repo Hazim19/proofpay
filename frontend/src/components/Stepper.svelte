@@ -65,4 +65,21 @@
     color: var(--red);
     font-weight: 600;
   }
+  /* Phones: labels wrap readably instead of truncating (§13 rule 5). */
+  @media (max-width: 720px) {
+    .stage-line {
+      gap: 6px;
+    }
+    .stage-label {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+      letter-spacing: 0.07em;
+      font-size: 9.5px;
+      line-height: 1.35;
+    }
+    .stage.current .stage-label {
+      max-width: 100%;
+    }
+  }
 </style>

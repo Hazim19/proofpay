@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import type { Contract, Health, LedgerEvent } from "./lib/types.ts";
   import { api, fetchHealth, setJsonSink } from "./lib/api.ts";
   import { moneyFig, sumEvents } from "./lib/format.ts";
@@ -21,7 +21,10 @@
   );
   let clientEmail = $state("client@example.com");
   let freelancerEmail = $state("freelancer@example.com");
-  let totalAmount = $state(500);
+  /* Amount is edited as text (§12 rule 6: GOV.UK inputmode pattern) and
+     validated as text; the API payload still sends Number(amountText),
+     exactly as before. */
+  let amountText = $state("500");
   let deliverable = $state(
     "Final landing page files in complete web format. The design covers the coffee brand brief: hero section, product grid, contact form. Summary and notes on how to use the files are included.",
   );
@@ -60,13 +63,97 @@
     }
   }
 
-  function createContract() {
+  /* ------------------------------------------------ form UX (§12) ----
+     Client-side validation mirrors the server's real rules (brief
+     non-empty, totalAmount > 0) plus a permissive "valid-ish" email
+     shape, so the UI never blocks a submission the server would accept.
+     Errors never clear typed input; a field's error clears as the user
+     fixes that field (recheck runs on input only for fields already in
+     error — nothing is flagged while typing a fresh field). */
+  type CreateField = "brief" | "amount" | "clientEmail" | "freelancerEmail";
+  const FIELD_ORDER: CreateField[] = ["brief", "amount", "clientEmail", "freelancerEmail"];
+  const FIELD_EL: Record<CreateField, string> = {
+    brief: "brief",
+    amount: "totalAmount",
+    clientEmail: "clientEmail",
+    freelancerEmail: "freelancerEmail",
+  };
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  let formErrors = $state<Partial<Record<CreateField, string>>>({});
+  const errorList = $derived(
+    FIELD_ORDER.filter((f) => formErrors[f]).map((f) => ({
+      key: f,
+      el: FIELD_EL[f],
+      msg: formErrors[f] as string,
+    })),
+  );
+  let deliverableError = $state<string | null>(null);
+
+  function checkField(f: CreateField): string | undefined {
+    switch (f) {
+      case "brief":
+        return brief.trim()
+          ? undefined
+          : "The brief is empty — describe the job, its deliverables and how success is judged.";
+      case "amount": {
+        const t = amountText.trim();
+        if (!t) return "Enter the total amount for the contract.";
+        const n = Number(t);
+        if (!Number.isFinite(n))
+          return "The amount must be a number — for example 500 or 1250.50.";
+        if (n <= 0)
+          return "The amount must be more than zero — escrow cannot hold nothing.";
+        return undefined;
+      }
+      case "clientEmail": {
+        const t = clientEmail.trim();
+        if (!t) return "Enter the client's email address.";
+        return EMAIL_RE.test(t)
+          ? undefined
+          : "This does not look like an email address — check it for an @ and a domain, like sb-buyer@personal.example.com.";
+      }
+      case "freelancerEmail": {
+        const t = freelancerEmail.trim();
+        if (!t) return "Enter the freelancer's email address.";
+        return EMAIL_RE.test(t)
+          ? undefined
+          : "This does not look like an email address — check it for an @ and a domain, like sb-seller@personal.example.com.";
+      }
+    }
+  }
+
+  function recheck(f: CreateField) {
+    if (!(f in formErrors)) return;
+    const msg = checkField(f);
+    const nextErr = { ...formErrors };
+    if (msg) nextErr[f] = msg;
+    else delete nextErr[f];
+    formErrors = nextErr;
+  }
+
+  async function validateCreate(): Promise<boolean> {
+    const errs: Partial<Record<CreateField, string>> = {};
+    for (const f of FIELD_ORDER) {
+      const m = checkField(f);
+      if (m) errs[f] = m;
+    }
+    formErrors = errs;
+    const first = FIELD_ORDER.find((f) => errs[f]);
+    if (!first) return true;
+    await tick();
+    document.getElementById(FIELD_EL[first])?.focus();
+    return false;
+  }
+
+  async function createContract() {
+    if (busyKey) return;
+    if (!(await validateCreate())) return;
     run("create", async () => {
       await api("/api/contracts", {
         brief,
         clientEmail,
         freelancerEmail,
-        totalAmount: Number(totalAmount),
+        totalAmount: Number(amountText),
         currency: "USD",
       });
       await refresh();
@@ -98,7 +185,22 @@
     });
   }
 
-  function submitWork(contractId: string, milestoneId: string) {
+  /* The deliverable textarea lives in the freelancer panel above; the
+     per-milestone submit button lives in MilestoneCard. An empty panel
+     is caught here, before the API call (server rule: content required),
+     and the error is shown at the field itself (§12 rules 7 & 9). */
+  async function submitWork(contractId: string, milestoneId: string) {
+    if (busyKey) return;
+    if (!deliverable.trim()) {
+      deliverableError =
+        "The delivery panel is empty — paste the work, or a link to it, and say where the evidence for each criterion is.";
+      await tick();
+      const el = document.getElementById("deliverable");
+      el?.scrollIntoView({ block: "center" });
+      el?.focus();
+      return;
+    }
+    deliverableError = null;
     run(`${contractId}:${milestoneId}:submit`, async () => {
       await api(`/api/contracts/${contractId}/milestones/${milestoneId}/submit`, {
         kind: "text",
@@ -259,16 +361,117 @@
           <div class="sc f">Drafted by AI from the brief</div>
         </div>
         <p class="hint">Write a brief; the AI turns it into a contract with milestones and weighted criteria of acceptance.</p>
-        <label for="brief">Job brief</label>
-        <textarea id="brief" rows="3" bind:value={brief} placeholder="Describe the job — what is to be delivered, and how success will be judged…"></textarea>
-        <label for="clientEmail">Client email</label>
-        <input id="clientEmail" bind:value={clientEmail} placeholder="client@example.com" />
-        <label for="freelancerEmail">Freelancer email</label>
-        <input id="freelancerEmail" bind:value={freelancerEmail} placeholder="freelancer@example.com" />
-        <label for="totalAmount">Total amount (USD)</label>
-        <input id="totalAmount" type="number" min="1" bind:value={totalAmount} placeholder="500" />
+
+        {#if errorList.length}
+          <div class="err-summary" role="alert">
+            <div class="es-head">There is a problem — the instrument cannot be drawn up yet</div>
+            <ul>
+              {#each errorList as e (e.key)}
+                <li>
+                  <a
+                    href="#{e.el}"
+                    onclick={(ev) => {
+                      ev.preventDefault();
+                      document.getElementById(e.el)?.focus();
+                    }}>{e.msg}</a
+                  >
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
+
+        <p class="req-line">
+          All entries are required — each is marked <span class="reqmark" aria-hidden="true">*</span>; nothing in this form is optional.
+        </p>
+
+        <div class="fgroup">
+          <div class="fg-head">The job</div>
+          <div class="field" class:invalid={!!formErrors.brief}>
+            <label for="brief">Job brief <span class="reqmark" aria-hidden="true">*</span><span class="vh">(required)</span></label>
+            <p class="fhint" id="brief-hint">
+              Say what is to be delivered, in what format, by when, and how success will be judged — the AI drafts the milestones and the acceptance criteria from this text. For example: “Design a landing page for a coffee brand — hero section, product grid and contact form — delivered as complete final files in web format, with a short summary of how to use them.”
+            </p>
+            {#if formErrors.brief}
+              <p class="ferr" id="brief-error"><span class="vh">Error: </span>{formErrors.brief}</p>
+            {/if}
+            <textarea
+              id="brief"
+              rows="6"
+              bind:value={brief}
+              oninput={() => recheck("brief")}
+              aria-invalid={!!formErrors.brief}
+              aria-describedby="brief-hint{formErrors.brief ? ' brief-error' : ''}"
+            ></textarea>
+          </div>
+          <div class="field" class:invalid={!!formErrors.amount}>
+            <label for="totalAmount">Total amount <span class="reqmark" aria-hidden="true">*</span><span class="vh">(required)</span></label>
+            <p class="fhint" id="amount-hint">
+              The total for the whole contract, in US dollars — the AI splits it across the milestones it drafts. This is sandbox test money; no real funds move.
+            </p>
+            {#if formErrors.amount}
+              <p class="ferr" id="amount-error"><span class="vh">Error: </span>{formErrors.amount}</p>
+            {/if}
+            <div class="amount-field" class:invalid={!!formErrors.amount}>
+              <span class="cur" aria-hidden="true">USD</span>
+              <input
+                id="totalAmount"
+                type="text"
+                inputmode="decimal"
+                autocomplete="off"
+                bind:value={amountText}
+                oninput={() => recheck("amount")}
+                aria-invalid={!!formErrors.amount}
+                aria-describedby="amount-hint{formErrors.amount ? ' amount-error' : ''}"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="fgroup">
+          <div class="fg-head">The parties</div>
+          <div class="field" class:invalid={!!formErrors.clientEmail}>
+            <label for="clientEmail">Client email <span class="reqmark" aria-hidden="true">*</span><span class="vh">(required)</span></label>
+            <p class="fhint" id="clientEmail-hint">
+              The client's PayPal sandbox address. Funding is authorised from this account at PayPal checkout, and the settlement is recorded against it. For the demo, use a sandbox buyer address (sb-…@personal.example.com).
+            </p>
+            {#if formErrors.clientEmail}
+              <p class="ferr" id="clientEmail-error"><span class="vh">Error: </span>{formErrors.clientEmail}</p>
+            {/if}
+            <input
+              id="clientEmail"
+              class="w-email"
+              type="email"
+              autocomplete="email"
+              bind:value={clientEmail}
+              oninput={() => recheck("clientEmail")}
+              aria-invalid={!!formErrors.clientEmail}
+              aria-describedby="clientEmail-hint{formErrors.clientEmail ? ' clientEmail-error' : ''}"
+            />
+          </div>
+          <div class="field" class:invalid={!!formErrors.freelancerEmail}>
+            <label for="freelancerEmail">Freelancer email <span class="reqmark" aria-hidden="true">*</span><span class="vh">(required)</span></label>
+            <p class="fhint" id="freelancerEmail-hint">
+              The freelancer's PayPal sandbox address. After a verdict, the earned share is paid out to this address — it belongs to the other party, so the browser will not autofill it for you.
+            </p>
+            {#if formErrors.freelancerEmail}
+              <p class="ferr" id="freelancerEmail-error"><span class="vh">Error: </span>{formErrors.freelancerEmail}</p>
+            {/if}
+            <input
+              id="freelancerEmail"
+              class="w-email"
+              type="email"
+              autocomplete="off"
+              bind:value={freelancerEmail}
+              oninput={() => recheck("freelancerEmail")}
+              aria-invalid={!!formErrors.freelancerEmail}
+              aria-describedby="freelancerEmail-hint{formErrors.freelancerEmail ? ' freelancerEmail-error' : ''}"
+            />
+          </div>
+        </div>
+
         <ActionButton anyBusy={busyKey !== null} working={busyKey === "create"} workingLabel="Drawing up" onclick={createContract}>
-          Draw up the contract
+          Draw up the contract from this brief
         </ActionButton>
       </section>
     {:else}
@@ -278,8 +481,25 @@
           <div class="sc f">Against a funded milestone</div>
         </div>
         <p class="hint">Pick a funded milestone below, then paste the delivery here and submit it from the milestone row.</p>
-        <label for="deliverable">Deliverable content (text or link)</label>
-        <textarea id="deliverable" rows="4" bind:value={deliverable} placeholder="Paste the delivered work — text or a link — exactly as it should be examined…"></textarea>
+        <div class="field" class:invalid={!!deliverableError}>
+          <label for="deliverable">Deliverable content (text or link) <span class="reqmark" aria-hidden="true">*</span><span class="vh">(required)</span></label>
+          <p class="fhint" id="deliverable-hint">
+            Paste the delivered work — the text itself, a link to the files, or a description of them — and say, criterion by criterion, where the evidence for each criterion is. The examiner reads exactly this text and checks it against the criteria recorded in the milestone below.
+          </p>
+          {#if deliverableError}
+            <p class="ferr" id="deliverable-error"><span class="vh">Error: </span>{deliverableError}</p>
+          {/if}
+          <textarea
+            id="deliverable"
+            rows="5"
+            bind:value={deliverable}
+            oninput={() => {
+              if (deliverableError && deliverable.trim()) deliverableError = null;
+            }}
+            aria-invalid={!!deliverableError}
+            aria-describedby="deliverable-hint{deliverableError ? ' deliverable-error' : ''}"
+          ></textarea>
+        </div>
       </section>
     {/if}
   </div>

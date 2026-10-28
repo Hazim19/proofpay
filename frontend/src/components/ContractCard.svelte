@@ -139,7 +139,12 @@
     }
     .parties > div + div {
       border-left: none;
+      border-top: 1px solid var(--rule);
       padding-left: 0;
+    }
+    .amount-row {
+      flex-wrap: wrap;
+      gap: 4px 16px;
     }
     .amount-row .amt {
       font-size: 30px;

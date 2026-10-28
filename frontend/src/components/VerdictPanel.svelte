@@ -195,6 +195,32 @@
       --rot: -2deg;
     }
   }
+  /* Phones: stamp centred above the settlement ledger, sized so its
+     rotation never reaches the screen edge (§13 rule 5). */
+  @media (max-width: 720px) {
+    .stamp-cell {
+      display: flex;
+      justify-content: center;
+      padding: 6px 4px 2px;
+    }
+    .stamp {
+      width: min(330px, 100%);
+      padding: 20px 18px 16px;
+    }
+    .stamp .s2 {
+      font-size: 42px;
+    }
+    .stamp .s1 {
+      font-size: 12.5px;
+      letter-spacing: 0.22em;
+    }
+    .settle .row .k {
+      font-size: 17.5px;
+    }
+    .settle .row .v {
+      font-size: 19px;
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .stamp {
       animation: none;

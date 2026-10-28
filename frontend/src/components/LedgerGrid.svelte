@@ -54,9 +54,29 @@
   });
 </script>
 
+<!-- Mobile treatment (§13): the ledger folio is deliberately wider than
+     a phone screen, so the grid keeps its own internal sideways scroll
+     (the page itself never scrolls sideways) and a cue line, shown only
+     on narrow screens, says so. Columns are not cut: the transaction
+     IDs are the evidence. -->
+<p class="ledger-cue">The ledger runs wider than this page — scroll it sideways</p>
 <div bind:this={gridEl} class="ag-theme-quartz ledger-grid"></div>
 
 <style>
+  .ledger-cue {
+    display: none;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 10.5px;
+    color: var(--faint);
+    margin: 12px 0 0;
+  }
+  @media (max-width: 720px) {
+    .ledger-cue {
+      display: block;
+    }
+  }
   /* AG Grid (sponsor requirement) dressed as a page of the register:
      paper ground, ruled rows, mono type, small-caps column heads,
      no quartz chrome, no blue. */

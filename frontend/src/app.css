@@ -148,6 +148,7 @@ body {
   color: var(--ink);
   border: none;
   padding: 9px 16px;
+  min-height: 44px; /* touch target (§13 rule 1) */
   cursor: pointer;
   transition:
     background-color 0.15s ease,
@@ -187,6 +188,9 @@ body {
   flex-wrap: wrap;
 }
 .regnav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px; /* touch target (§13 rule 1) */
   font-family: var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.16em;
@@ -375,6 +379,155 @@ textarea {
   line-height: 1.55;
 }
 
+/* ------------------------------------------- form UX (§12 referensi-ui) */
+/* Persistent hints under each label, explicit required marking, grouped
+   fields under ruled subheads, per-field errors in stamp red-brown with a
+   ruled marker, and a register-styled error summary at the form head. */
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.req-line {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 11px;
+  color: var(--faint);
+  margin: 20px 0 0;
+}
+.reqmark {
+  color: var(--stamp);
+  font-weight: 700;
+}
+.fgroup {
+  margin-top: 4px;
+}
+.fg-head {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  border-bottom: 2px solid var(--rule-dark);
+  padding-bottom: 6px;
+  margin-top: 30px;
+}
+.fhint {
+  font-style: italic;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--faint);
+  margin: 3px 0 7px;
+  max-width: 680px;
+}
+.ferr {
+  border-left: 3px solid var(--stamp);
+  color: var(--stamp);
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  margin: 4px 0 9px;
+  padding: 2px 0 2px 10px;
+  max-width: 680px;
+}
+.field.invalid input,
+.field.invalid textarea {
+  border-bottom: 2px solid var(--stamp);
+}
+.err-summary {
+  border: 2px solid var(--stamp);
+  background: rgba(154, 59, 38, 0.05);
+  padding: 14px 18px 12px;
+  margin-top: 22px;
+}
+.err-summary .es-head {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--stamp);
+}
+.err-summary ul {
+  margin: 8px 0 2px;
+  padding-left: 18px;
+}
+.err-summary li {
+  margin: 3px 0;
+  font-size: 15.5px;
+  line-height: 1.45;
+}
+.err-summary a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--rule);
+}
+.err-summary a:hover {
+  color: var(--green);
+  text-decoration-color: var(--green);
+}
+.err-summary a:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+/* Width follows the expected content (§12 rule 4). */
+.w-email {
+  max-width: 440px;
+}
+.amount-field {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  max-width: 230px;
+  border-bottom: 1px solid var(--rule-dark);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.amount-field:hover {
+  border-bottom-color: var(--ink-soft);
+}
+.amount-field:focus-within {
+  border-bottom: 2px solid var(--green);
+  background: rgba(30, 86, 49, 0.045);
+}
+.amount-field.invalid {
+  border-bottom: 2px solid var(--stamp);
+}
+.amount-field .cur {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  padding-left: 2px;
+}
+.amount-field input {
+  border-bottom: none;
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+.amount-field input:hover,
+.amount-field input:focus {
+  border-bottom: none;
+  background: transparent;
+  padding-bottom: 8px;
+}
+/* The brief reads as a ruled writing area in the register. */
+textarea#brief {
+  border-left: 1px solid var(--rule);
+  padding-left: 14px;
+  background: rgba(243, 237, 221, 0.35);
+}
+textarea#brief:focus {
+  background: rgba(30, 86, 49, 0.045);
+}
+
 /* -------------------------------------------------------------- buttons */
 /* Full state system in the print language (§11): solid block + arrow at
    rest, colour shift or full inversion on hover, press-shift on active,
@@ -382,6 +535,7 @@ textarea {
    with animated ellipsis while its own call is running. */
 button.action {
   margin-top: 20px;
+  min-height: 44px; /* touch target (§13 rule 1) */
   font-family: var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -487,6 +641,7 @@ button.action .ell::after {
 }
 .appendix summary {
   cursor: pointer;
+  padding: 12px 0; /* touch target (§13 rule 1) */
   font-family: var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.18em;
@@ -548,7 +703,7 @@ button.action .ell::after {
   font-size: 11px;
 }
 
-/* ------------------------------------------------------------ responsive */
+/* ------------------------------------------------- responsive (§13) */
 @media (max-width: 1020px) {
   .ledger-kpi {
     grid-template-columns: repeat(2, 1fr);
@@ -559,6 +714,9 @@ button.action .ell::after {
   .ledger-kpi > div:nth-child(odd) {
     border-left: none;
     padding-left: 0;
+  }
+  .ledger-kpi > div:nth-child(n + 3) {
+    border-top: 1px solid var(--rule);
   }
   .steps {
     grid-template-columns: 1fr;
@@ -573,22 +731,82 @@ button.action .ell::after {
   .page {
     padding: 30px 20px 44px;
   }
+  .mast-top {
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
   .mast-top .mast-mid {
     display: none;
   }
   .tagline {
     font-size: 19px;
   }
-  .ledger-kpi {
-    grid-template-columns: 1fr;
+  .status-line {
+    letter-spacing: 0.12em;
+    line-height: 1.9;
   }
+  /* Role toggle spans the measure; both parties share it equally. */
+  .acting-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .acting {
+    justify-content: space-between;
+  }
+  .switch {
+    flex: 1;
+    margin-left: 14px;
+  }
+  .switch button {
+    flex: 1;
+  }
+  .regnav {
+    gap: 4px 18px;
+  }
+  /* KPI stays a ruled 2×2 on phones (§13 rule 5), figures shrink to fit. */
   .ledger-kpi > div {
-    border-left: none;
+    padding: 16px 14px 14px;
+  }
+  .ledger-kpi > div:nth-child(odd) {
     padding-left: 0;
+  }
+  .ledger-kpi .fig {
+    font-size: 32px;
+  }
+  .ledger-kpi .fig small {
+    font-size: 19px;
+  }
+  .ledger-kpi .note {
+    font-size: 14px;
   }
   .sec-head {
     flex-direction: column;
     gap: 4px;
+  }
+  /* Primary actions go full-width on phones (§13 rule 1). */
+  button.action {
+    width: 100%;
+  }
+  .err-summary {
+    padding: 12px 14px 10px;
+  }
+  .fg-head {
+    margin-top: 24px;
+  }
+}
+@media (max-width: 420px) {
+  .page {
+    padding: 26px 16px 40px;
+  }
+  .ledger-kpi .fig {
+    font-size: 27px;
+  }
+  .ledger-kpi .fig small {
+    font-size: 16px;
+  }
+  .status-line {
+    font-size: 10.5px;
   }
 }
 

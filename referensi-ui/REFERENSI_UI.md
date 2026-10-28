@@ -416,3 +416,201 @@ garis aturan) — BUKAN kembali ke pill/biru/kartu lembut.
 - **Cap vonis** masuk dengan animasi "ditekan" singkat (skala/rotasi
   mengendap 350 ms) saat pertama dirender; semua gerak 120–180 ms dan
   dimatikan di bawah `prefers-reduced-motion` (aturan 9).
+
+## 12. UX formulir — ditambahkan 2026-10-28
+
+Pemicu: pengguna menilai formulir belum cukup jelas "mana yang diisi".
+Bagian ini merangkum aturan desain formulir dari sumber otoritatif, lalu
+memetakan penerapannya ke kedua formulir ProofPay (instrumen baru +
+penyerahan deliverable) di dalam identitas Arah A.
+
+### Aturan dari sumber
+
+1. **Label selalu terlihat dan persisten; placeholder bukan label.**
+   Placeholder hilang begitu pengguna mengetik, membebani ingatan jangka
+   pendek, disangka data yang sudah terisi, dan kontrasnya buruk — tujuh
+   masalah yang terdokumentasi. Placeholder hanya pantas sebagai contoh
+   format singkat, tidak pernah membawa informasi penting sendirian.
+   (Nielsen Norman Group, "Placeholders in Form Fields Are Harmful" —
+   https://www.nngroup.com/articles/placeholders-form-fields/)
+2. **Hint/deskripsi terpisah dari label, berisi contoh input yang baik
+   dan alasan data itu diminta.** GOV.UK menaruh hint sebagai elemen
+   sendiri yang dirujuk `aria-describedby`, bukan di dalam label.
+   Baymard menemukan pengguna enggan memberi data yang tidak dijelaskan
+   tujuannya (studi nomor telepon: >70% responden enggan) — deskripsi
+   field yang menjawab "untuk apa" dan "seperti apa isinya" mengurangi
+   keraguan dan kesalahan. (GOV.UK Design System — komponen Text input &
+   Textarea, bagian Hint; Baymard Institute — riset deskripsi field
+   checkout.)
+3. **Tandai wajib vs opsional secara eksplisit.** Hanya 14% situs
+   menandai kedua jenis field secara eksplisit; 32% peserta uji Baymard
+   melewatkan setidaknya satu field wajib pada formulir yang hanya
+   menandai field opsional. NNGroup menganjurkan penandaan yang dieja,
+   bukan tersirat. Bila semua field wajib: nyatakan sekali di kepala
+   formulir DAN tandai tiap label, agar tidak ada ambiguitas.
+   (Baymard Institute, "E-Commerce Checkouts Need to Mark Both Required
+   Fields and Optional Fields Explicitly" —
+   https://baymard.com/blog/required-optional-form-fields ; NNGroup,
+   panduan penandaan required/optional.)
+4. **Lebar field mengikuti panjang isi yang diharapkan.** Lebar adalah
+   isyarat tentang jawaban yang diharapkan; GOV.UK menyediakan kelas
+   lebar berbasis karakter. Awalan mata uang ("USD") ditempatkan di
+   dalam field sebagai prefix, bukan di label. (GOV.UK Design System —
+   Text input, bagian Width dan Prefix/suffix; Baymard — affordance
+   panjang field.)
+5. **Kelompokkan field yang berhubungan di bawah subjudul.** Kelompok
+   visual mengurangi beban kognitif dan membuat urutan pengisian masuk
+   akal; GOV.UK memakai pengelompokan/fieldset untuk pertanyaan yang
+   berkaitan. (GOV.UK Design System — pola pertanyaan & fieldset;
+   NNGroup — struktur formulir.)
+6. **Semantik input harus benar: type, inputmode, autocomplete.**
+   `type="email"` memanggil keyboard yang tepat; `autocomplete` mengikuti
+   tujuan WCAG — TAPI alamat email pihak ketiga tidak boleh memakai
+   `autocomplete="email"`, karena browser akan menyisipkan alamat
+   pengguna sendiri ke field milik orang lain. GOV.UK meninggalkan
+   `type="number"` (masalah screen reader, voice control, dan penghapusan
+   huruf diam-diam) dan memakai input teks + `inputmode` untuk nilai
+   numerik. (GOV.UK Design System — Text input & riset type=number;
+   WCAG 1.3.5 Identify Input Purpose.)
+7. **Validasi inline saat submit; pesan per-field spesifik, bahasa
+   polos, menempel pada field-nya.** GOV.UK mewajibkan pesan spesifik
+   per keadaan error ("Enter X", "X must be …"), diawali penanda
+   "Error:" untuk screen reader dan dirujuk lewat `aria-describedby`.
+   Baymard: 98% situs menampilkan pesan error generik padahal sistem
+   tahu persis masalahnya. NNGroup: jangan menandai field saat pengguna
+   masih mengetik; nilai setelah selesai/submit. (GOV.UK Design System —
+   komponen Error message; Baymard — riset validasi checkout; NNGroup —
+   panduan pesan error formulir.)
+8. **Ringkasan error di kepala formulir.** GOV.UK: selalu tampilkan
+   ringkasan walau hanya satu error; judul "There is a problem"; tiap
+   butir berupa tautan ke field-nya; redaksi sama persis dengan pesan
+   inline. Deviasi yang dicatat: GOV.UK memindahkan fokus ke ringkasan;
+   di sini fokus dipindahkan ke field pertama yang salah (satu formulir
+   pendek dalam satu layar), ringkasan tetap `role="alert"` agar
+   diumumkan, dan tautannya melompat ke field masing-masing.
+   (GOV.UK Design System — komponen Error summary & pola Validation.)
+9. **Error tidak pernah menghapus isian pengguna, dan hilang satu per
+   satu saat field-nya diperbaiki.** Menghapus input saat error adalah
+   pola yang dilarang panduan validasi GOV.UK; Baymard mencatat error
+   yang tetap tampil setelah diperbaiki sebagai kegagalan umum. Karena
+   itu field yang sedang ber-error direvalidasi saat pengguna mengetik
+   di field itu saja — field lain tidak ditandai sebelum submit.
+   (GOV.UK — pola Validation; Baymard — riset validasi inline.)
+10. **Satu kolom.** Formulir satu kolom selesai lebih cepat dan lebih
+    sedikit error daripada multi-kolom (riset Baymard/CXL yang dirujuk
+    panduan NNGroup). Tata letak ProofPay sudah satu kolom;
+    dipertahankan.
+11. **Tombol submit menyatakan akibatnya.** Label tombol memakai kata
+    kerja + objek + hasil ("Draw up the contract from this brief"),
+    bukan "Submit" generik — pengguna tahu persis apa yang terjadi
+    setelah klik. (NNGroup — penamaan tombol & microcopy formulir;
+    GOV.UK — kekhususan label aksi.)
+
+### Penerapan di ProofPay (Arah A)
+
+- **Formulir instrumen baru** dikelompokkan: "The job" (brief + total)
+  dan "The parties" (email klien + email freelancer), masing-masing di
+  bawah subjudul bergaris. Baris register menyatakan "All entries are
+  required"; tiap label bertanda * merah cap + teks "(required)" untuk
+  screen reader (aturan 3, 5).
+- **Tiap field punya hint serif miring** di bawah label: brief memuat
+  contoh brief yang baik di dalam teks hint (bukan data prefill palsu);
+  email menjelaskan alamat sandbox siapa dan ke mana pembayaran/catatan
+  pergi; total menjelaskan bahwa angka itu total seluruh kontrak dalam
+  uang uji sandbox (aturan 2). Placeholder lama dicabut — hint yang
+  persisten menggantikannya (aturan 1).
+- **Lebar mengikuti isi:** brief lebar penuh 6 baris dengan rasa area
+  tulis bergaris; email dibatasi selebar alamat; total sempit dengan
+  awalan "USD" di dalam field (aturan 4).
+- **Semantik:** email klien `type="email"` + `autocomplete="email"`;
+  email freelancer `type="email"` + `autocomplete="off"` (alamat pihak
+  ketiga, aturan 6); total menjadi input teks + `inputmode="decimal"`,
+  divalidasi sebagai teks lalu dikirim sebagai angka seperti sebelumnya.
+  Hint dan error dirujuk `aria-describedby`; field ber-error
+  `aria-invalid="true"`.
+- **Validasi klien saat submit** mencerminkan aturan server persis
+  (brief tidak kosong; total > 0; deliverable tidak kosong) ditambah
+  pemeriksaan format email yang longgar ("valid-ish": satu @ dan domain
+  bertitik), karena server tidak memformat email. Pesan per-field dalam
+  bahasa polos menempel di bawah label dengan penanda garis merah cap;
+  ringkasan error bergaya register muncul di kepala formulir; fokus
+  pindah ke field pertama yang salah; isian tidak pernah dihapus; error
+  hilang per-field saat diperbaiki (aturan 7, 8, 9). Error server tetap
+  mengalir ke area notice yang sudah ada.
+- **Formulir deliverable** mendapat perlakuan sama: hint menjelaskan apa
+  yang ditempel dan bagaimana tiap kriteria dibuktikan, penandaan wajib,
+  error inline bila kosong, dan tombolnya berbunyi "Submit the
+  deliverable for examination →" (aturan 11 berlaku juga untuk tombol
+  "Draw up the contract from this brief →").
+
+## 13. Responsif & layar sentuh — ditambahkan 2026-10-28
+
+Pemicu: pengguna meminta UI benar-benar nyaman di ponsel (perangkat
+pengguna: iPhone 13 Pro, 390×844 CSS px; juri bisa membuka demo dari
+ponsel juga). Aturan di bawah diterapkan di seluruh aplikasi, tetap di
+dalam identitas Arah A.
+
+### Aturan dari sumber
+
+1. **Sasaran sentuh minimum 44px.** Apple HIG menetapkan area sentuh
+   minimum 44×44 pt; Material menetapkan 48×48 dp dengan jarak antar
+   sasaran yang bersebelahan. Di sini: semua tombol dan pemilih peran
+   ber-`min-height: 44px`, tombol aksi melebar penuh di layar sempit,
+   dan jarak antar tombol yang bersebelahan ≥8px (gap yang sudah ada
+   10px dipertahankan). (Apple Human Interface Guidelines — Layout &
+   Buttons; Material Design — touch targets & spacing.)
+2. **Font input ≥16px agar iOS tidak melakukan zoom paksa.** Safari iOS
+   memperbesar halaman secara otomatis saat field berfont <16px
+   difokuskan; input ProofPay 17.5px, jadi tidak ada zoom dan tidak ada
+   pergeseran tata letak saat mengetik. (Konvensi Safari iOS; sejalan
+   dengan panduan formulir mobile NNGroup.)
+3. **Satu kolom, tanpa gulir horizontal pada konten halaman.** NNGroup
+   untuk mobile: konten mengalir satu kolom, elemen interaktif besar,
+   dan halaman tidak boleh bisa digeser menyamping — gulir horizontal
+   hanya boleh terjadi di dalam komponen yang memang dirancang untuk
+   itu (di sini: ledger AG Grid), dan harus diberi isyarat visual.
+   (Nielsen Norman Group — mobile usability & form design guidance.)
+4. **Tabel data tidak dipampatkan; disusun ulang.** Di layar sempit
+   tabel pemeriksaan diubah menjadi tumpukan per kriteria (nomor,
+   kriteria, bobot + temuan, bukti) — bukan tabel 5 kolom yang diperas
+   sampai tak terbaca. (Pola responsive-table NNGroup: reflow, bukan
+   shrink.)
+5. **Hierarki tetap terbaca saat menyempit.** Masthead mengecil
+   bertahap (garis register membungkus/menyembunyikan bagian tengah),
+   angka KPI menjadi kisi 2×2, langkah № menumpuk, para pihak pada
+   instrumen menumpuk, dan garis tahap membungkus labelnya alih-alih
+   memotongnya dengan elipsis.
+
+### Penerapan di ProofPay
+
+- **Masthead:** garis register atas membungkus; bagian tengah sudah
+  disembunyikan ≤720px; baris status membungkus wajar; wordmark memakai
+  clamp yang sudah ada.
+- **KPI:** ≤720px menjadi kisi 2×2 bergaris (bukan satu kolom panjang),
+  figur mengecil ke 32px agar "USD 500.00" muat tanpa meluber.
+- **Toggle peran:** melebar penuh, kedua sisi berbagi lebar sama,
+  tinggi ≥44px. Tautan navigasi register mendapat tinggi sentuh 44px.
+- **Instrumen:** para pihak menumpuk (sudah ada), judul 28px, baris
+  total membungkus.
+- **Tabel pemeriksaan:** ≤720px menjadi tumpukan grid per kriteria:
+  gutter nomor, kriteria, lalu baris bobot + temuan, lalu bukti satu
+  lebar penuh; header tabel disembunyikan secara visual (tetap ada
+  untuk teknologi bantu).
+- **Vonis:** cap berada di tengah di atas buku penyelesaian, ukuran cap
+  dibatasi 340px dan "Release NN%" mengecil ke 44px agar cap miring
+  tidak terpotong tepi layar.
+- **Garis tahap:** label boleh membungkus (letter-spacing diperkecil),
+  tidak lagi elipsis.
+- **Formulir:** sudah satu kolom lebar penuh; lebar maksimum email/
+  total otomatis menjadi 100% di layar sempit karena dibatasi lebar
+  kolom.
+- **Ledger AG Grid — keputusan:** dipertahankan sebagai gulir
+  horizontal internal (folio yang memang lebih lebar dari halaman),
+  ditambah baris isyarat mono yang hanya tampil di layar sempit
+  ("The ledger runs wider than this page — scroll it sideways"),
+  karena memangkas kolom akan membuang ID transaksi yang justru
+  menjadi bukti. Bukan gulir halaman: halaman sendiri tidak bergerak
+  menyamping (aturan 3).
+- **Tombol:** `.action` ber-`min-height: 44px` di semua lebar; di
+  ≤720px tombol aksi melebar penuh dan deretan aksi milestone menumpuk
+  vertikal.
