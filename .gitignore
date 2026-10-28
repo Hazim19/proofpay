@@ -1,0 +1,8 @@
+node_modules/
+.env
+KONSEP.md
+SUBMISSION_DRAFT.md
+data/
+deploy/proofpay.env
+*.log
+dist/

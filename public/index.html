@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ProofPay — AI-verified milestone escrow</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/styles/ag-grid.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/styles/ag-theme-quartz.css" />
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7f9; color: #14213d; }
+  header { background: #003087; color: #fff; padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 22px; }
+  header p { margin: 4px 0 0; opacity: .85; font-size: 13px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px; }
+  .roles { display: flex; gap: 8px; margin-bottom: 16px; }
+  .roles button { padding: 8px 16px; border-radius: 999px; border: 1px solid #003087; background: #fff; cursor: pointer; }
+  .roles button.active { background: #003087; color: #fff; }
+  section { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  label { display: block; font-size: 13px; margin: 8px 0 4px; }
+  input, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+  button.action { background: #0070e0; color: #fff; border: 0; padding: 8px 14px; border-radius: 6px; cursor: pointer; margin: 4px 4px 0 0; }
+  button.action:disabled { background: #9db8d2; cursor: default; }
+  .milestone { border-top: 1px solid #eee; padding: 10px 0; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #e8eefc; font-size: 12px; }
+  #ledgerGrid { height: 320px; width: 100%; }
+  .hint { font-size: 12px; color: #666; }
+  pre { background: #0d1526; color: #cfe3ff; padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ProofPay</h1>
+  <p>Milestone escrow for freelance work — funds are released only after AI verifies the delivery. (Scaffold build: AI is a deterministic stub, PayPal runs in mock mode until sandbox credentials are set.)</p>
+</header>
+<main>
+  <div class="roles">
+    <button id="roleClient" class="active" onclick="setRole('client')">I am the Client</button>
+    <button id="roleFreelancer" onclick="setRole('freelancer')">I am the Freelancer</button>
+    <span class="hint" id="modeInfo"></span>
+  </div>
+
+  <section id="clientPanel">
+    <h2>New contract (client)</h2>
+    <label>Job brief</label>
+    <textarea id="brief" rows="3">Design a landing page for a coffee brand, including hero section, product grid and contact form. Deliver complete final files in web format with a short summary of how to use them.</textarea>
+    <label>Client email</label>
+    <input id="clientEmail" value="client@example.com" />
+    <label>Freelancer email</label>
+    <input id="freelancerEmail" value="freelancer@example.com" />
+    <label>Total amount (USD)</label>
+    <input id="totalAmount" type="number" value="500" min="1" />
+    <button class="action" onclick="createContract()">Create contract from brief</button>
+  </section>
+
+  <section id="freelancerPanel" style="display:none">
+    <h2>Submit a deliverable (freelancer)</h2>
+    <p class="hint">Pick a funded milestone below, then paste the delivery here and submit it from the milestone row.</p>
+    <label>Deliverable content (text or link)</label>
+    <textarea id="deliverable" rows="4">Final landing page files in complete web format. The design covers the coffee brand brief: hero section, product grid, contact form. Summary and notes on how to use the files are included.</textarea>
+  </section>
+
+  <section>
+    <h2>Contracts &amp; milestones</h2>
+    <div id="contracts"></div>
+  </section>
+
+  <section>
+    <h2>Ledger — evidence trail</h2>
+    <div id="ledgerGrid" class="ag-theme-quartz"></div>
+  </section>
+
+  <section>
+    <h2>Last API response</h2>
+    <pre id="out">{}</pre>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js"></script>
+<script>
+let role = 'client';
+let gridApi = null;
+
+function setRole(r) {
+  role = r;
+  document.getElementById('roleClient').classList.toggle('active', r === 'client');
+  document.getElementById('roleFreelancer').classList.toggle('active', r === 'freelancer');
+  document.getElementById('clientPanel').style.display = r === 'client' ? '' : 'none';
+  document.getElementById('freelancerPanel').style.display = r === 'freelancer' ? '' : 'none';
+  renderContracts(window._contracts || []);
+}
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = await res.json();
+  document.getElementById('out').textContent = JSON.stringify(json, null, 2);
+  return json;
+}
+
+async function refresh() {
+  const health = await (await fetch('/health')).json();
+  document.getElementById('modeInfo').textContent =
+    'PayPal: ' + health.paypalMode + ' (' + health.paypalEnv + ')';
+  const data = await api('/api/contracts');
+  window._contracts = data.contracts || [];
+  renderContracts(window._contracts);
+  const events = await api('/api/events');
+  if (gridApi) gridApi.setGridOption('rowData', (events.events || []).slice().reverse());
+}
+
+function renderContracts(contracts) {
+  const el = document.getElementById('contracts');
+  if (!contracts.length) { el.innerHTML = '<p class="hint">No contracts yet.</p>'; return; }
+  el.innerHTML = contracts.map(c => `
+    <div>
+      <strong>${c.title}</strong><br/>
+      <span class="hint">${c.id} · client ${c.clientEmail} · freelancer ${c.freelancerEmail}</span>
+      ${c.milestones.map(m => `
+        <div class="milestone">
+          <strong>${m.title}</strong> — ${m.amount} ${m.currency}
+          <span class="badge">${m.status}</span>
+          ${m.verification ? `<span class="badge">verified: ${m.verification.overall} · release ${(m.verification.releaseFraction*100).toFixed(0)}%</span>` : ''}
+          <div>
+            ${role === 'client' && m.status === 'draft' ? `<button class="action" onclick="act('${c.id}','${m.id}','fund')">Fund (authorize via PayPal)</button>` : ''}
+            ${role === 'freelancer' && (m.status === 'funded' || m.status === 'failed') ? `<button class="action" onclick="submitWork('${c.id}','${m.id}')">Submit deliverable</button>` : ''}
+            ${m.status === 'submitted' ? `<button class="action" onclick="act('${c.id}','${m.id}','verify')">Verify with AI</button>` : ''}
+            ${role === 'client' && m.verification && m.status !== 'released' ? `<button class="action" onclick="act('${c.id}','${m.id}','release')">Release per verification</button>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>`).join('<hr/>');
+}
+
+async function createContract() {
+  await api('/api/contracts', {
+    brief: document.getElementById('brief').value,
+    clientEmail: document.getElementById('clientEmail').value,
+    freelancerEmail: document.getElementById('freelancerEmail').value,
+    totalAmount: Number(document.getElementById('totalAmount').value),
+    currency: 'USD',
+  });
+  refresh();
+}
+
+async function submitWork(contractId, milestoneId) {
+  await api(`/api/contracts/${contractId}/milestones/${milestoneId}/submit`, {
+    kind: 'text',
+    content: document.getElementById('deliverable').value,
+  });
+  refresh();
+}
+
+async function act(contractId, milestoneId, action) {
+  await api(`/api/contracts/${contractId}/milestones/${milestoneId}/${action}`, {});
+  refresh();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  gridApi = agGrid.createGrid(document.getElementById('ledgerGrid'), {
+    columnDefs: [
+      { field: 'ts', headerName: 'Time', width: 190 },
+      { field: 'type', headerName: 'Event', width: 180 },
+      { field: 'contractId', headerName: 'Contract', width: 130 },
+      { field: 'milestoneId', headerName: 'Milestone', width: 150 },
+      { field: 'detail', headerName: 'Detail', flex: 1, valueFormatter: p => JSON.stringify(p.value || {}) },
+    ],
+    rowData: [],
+  });
+  refresh();
+});
+</script>
+</body>
+</html>

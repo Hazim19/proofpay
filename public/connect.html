@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ProofPay — Connect</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  body { max-width: 640px; margin: 2rem auto; padding: 0 1rem; line-height: 1.45; }
+  fieldset { border: 1px solid #8886; border-radius: 8px; margin: 1rem 0; }
+  legend { font-weight: 600; padding: 0 .4rem; }
+  label { display: block; margin: .7rem 0 .2rem; font-weight: 600; }
+  input, select { width: 100%; box-sizing: border-box; padding: .5rem; border-radius: 6px; border: 1px solid #8888; }
+  .hint { font-size: .85rem; opacity: .75; margin-top: .15rem; }
+  .status { font-size: .9rem; margin-top: .3rem; }
+  .ok { color: #1a7f37; font-weight: 600; }
+  .no { color: #b35900; font-weight: 600; }
+  button { padding: .6rem 1.2rem; border-radius: 6px; border: 0; background: #0070e0; color: #fff; font-weight: 600; cursor: pointer; }
+  #msg { margin-top: 1rem; font-weight: 600; }
+  code { background: #8882; padding: 0 .3rem; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>ProofPay — Connect</h1>
+<p>
+  Paste sandbox credentials here to switch ProofPay from offline mock mode to
+  the real PayPal sandbox (and, optionally, to a live AI model). Values are
+  stored server-side in a permission-locked local file, take effect
+  immediately, and are <strong>never shown again</strong> — this page only
+  reports whether each value is configured. Leave a field blank to keep the
+  value already stored.
+</p>
+
+<fieldset id="tokenBox" hidden>
+  <legend>Setup token</legend>
+  <label for="setupToken">Setup token</label>
+  <input id="setupToken" type="password" autocomplete="off"
+         placeholder="Required by this deployment" />
+  <div class="hint">This deployment sets <code>PROOFPAY_SETUP_TOKEN</code>;
+    the token is required to view or change these settings.</div>
+</fieldset>
+
+<form id="connectForm">
+  <fieldset>
+    <legend>PayPal</legend>
+    <label for="clientId">Client ID</label>
+    <input id="clientId" type="text" autocomplete="off" spellcheck="false" />
+    <div class="status" id="clientIdStatus"></div>
+
+    <label for="clientSecret">Client Secret</label>
+    <input id="clientSecret" type="password" autocomplete="off" />
+    <div class="status" id="clientSecretStatus"></div>
+
+    <label for="paypalEnv">Environment</label>
+    <select id="paypalEnv">
+      <option value="sandbox">sandbox</option>
+      <option value="live">live</option>
+    </select>
+    <div class="hint">Sandbox app credentials come from
+      developer.paypal.com → Apps &amp; Credentials → Sandbox.</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>AI model (optional)</legend>
+    <label for="aiBaseUrl">AI_BASE_URL</label>
+    <input id="aiBaseUrl" type="text" autocomplete="off" spellcheck="false"
+           placeholder="https://api.openai.com/v1" />
+    <div class="status" id="aiBaseUrlStatus"></div>
+
+    <label for="aiApiKey">AI_API_KEY</label>
+    <input id="aiApiKey" type="password" autocomplete="off" />
+    <div class="status" id="aiApiKeyStatus"></div>
+
+    <label for="aiModel">AI_MODEL</label>
+    <input id="aiModel" type="text" autocomplete="off" spellcheck="false" />
+    <div class="status" id="aiModelStatus"></div>
+    <div class="hint">All three AI values are needed for live AI mode;
+      without them the deterministic offline stubs are used.</div>
+  </fieldset>
+
+  <button type="submit">Save &amp; apply (no restart needed)</button>
+  <div id="msg" role="status"></div>
+</form>
+
+<p class="hint"><a href="/">← back to the ProofPay demo</a></p>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const tokenInput = document.getElementById("setupToken");
+  if (params.get("setup_token")) tokenInput.value = params.get("setup_token");
+
+  const headers = () => {
+    const h = { "Content-Type": "application/json" };
+    const t = tokenInput.value.trim();
+    if (t) h["x-setup-token"] = t;
+    return h;
+  };
+
+  const mark = (el, st, extra = "") => {
+    el.innerHTML = st.configured
+      ? `<span class="ok">configured</span> (from ${st.source})${extra}`
+      : `<span class="no">not configured</span>`;
+  };
+
+  async function loadStatus() {
+    const res = await fetch("/api/settings", { headers: headers() });
+    if (res.status === 401) {
+      document.getElementById("tokenBox").hidden = false;
+      document.getElementById("msg").textContent =
+        "A setup token is required — enter it above, then press Save.";
+      return null;
+    }
+    const s = await res.json();
+    if (s.setupTokenRequired) document.getElementById("tokenBox").hidden = false;
+    mark(document.getElementById("clientIdStatus"), s.paypal.clientId,
+         s.paypal.clientId.last4 ? `, id ends …${s.paypal.clientId.last4}` : "");
+    mark(document.getElementById("clientSecretStatus"), s.paypal.clientSecret);
+    document.getElementById("paypalEnv").value = s.paypal.env.value;
+    mark(document.getElementById("aiBaseUrlStatus"), s.ai.baseUrl);
+    mark(document.getElementById("aiApiKeyStatus"), s.ai.apiKey);
+    mark(document.getElementById("aiModelStatus"), s.ai.model,
+         s.ai.model.value ? ` (${s.ai.model.value})` : "");
+    return s;
+  }
+
+  document.getElementById("connectForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("msg");
+    const body = {};
+    const put = (id, key) => {
+      const v = document.getElementById(id).value.trim();
+      if (v) body[key] = v;
+    };
+    put("clientId", "PAYPAL_CLIENT_ID");
+    put("clientSecret", "PAYPAL_CLIENT_SECRET");
+    body.PAYPAL_ENV = document.getElementById("paypalEnv").value;
+    put("aiBaseUrl", "AI_BASE_URL");
+    put("aiApiKey", "AI_API_KEY");
+    put("aiModel", "AI_MODEL");
+
+    msg.textContent = "Saving…";
+    const res = await fetch("/api/settings", {
+      method: "POST", headers: headers(), body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      msg.textContent = `Failed: ${err.error ?? res.status}`;
+      return;
+    }
+    // Clear the secret fields so values never linger on screen.
+    document.getElementById("clientId").value = "";
+    document.getElementById("clientSecret").value = "";
+    document.getElementById("aiApiKey").value = "";
+    await loadStatus();
+    msg.textContent = "Saved and live. New values are already in effect.";
+  });
+
+  loadStatus();
+</script>
+</body>
+</html>

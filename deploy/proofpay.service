@@ -1,0 +1,14 @@
+[Unit]
+Description=ProofPay — AI-verified milestone escrow (PayPal AI Hackathon demo)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=-__APP_DIR__/deploy/proofpay.env
+ExecStart=/usr/bin/node src/server.ts
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
