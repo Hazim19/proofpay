@@ -55,6 +55,31 @@ export class AiError extends Error {
 // prompt during provider slowdowns, so 60s was too tight for real verdicts.
 const REQUEST_TIMEOUT_MS = 180_000;
 
+// Audit S-10: one shared deadline per logical request. Callers pass a
+// `deadlineAt`; every attempt (including the response_format fallback and
+// the drafter's repair call) draws from the SAME budget instead of each
+// restarting a fresh 180s, and at most MAX_CONCURRENT_AI calls run at
+// once, so a burst of requests cannot exhaust the provider quota.
+const MAX_CONCURRENT_AI = 3;
+let aiInFlight = 0;
+const aiWaiters: Array<() => void> = [];
+async function acquireAiSlot(): Promise<void> {
+  if (aiInFlight < MAX_CONCURRENT_AI) {
+    aiInFlight++;
+    return;
+  }
+  // When woken, the slot has been handed over directly (count unchanged).
+  await new Promise<void>((resolve) => aiWaiters.push(resolve));
+}
+function releaseAiSlot(): void {
+  const next = aiWaiters.shift();
+  if (next) {
+    next();
+    return;
+  }
+  aiInFlight--;
+}
+
 interface ChatCompletionResponse {
   choices?: { message?: { content?: unknown } }[];
 }
@@ -68,10 +93,12 @@ interface ChatCompletionResponse {
 export async function chatCompletionText(
   config: AiConfig,
   messages: ChatMessage[],
+  opts: { deadlineAt?: number } = {},
 ): Promise<string> {
   if (config.mode !== "live" || !config.baseUrl || !config.apiKey || !config.model) {
     throw new AiError("AI live mode is not configured (AI_BASE_URL, AI_API_KEY, AI_MODEL)");
   }
+  const deadlineAt = opts.deadlineAt ?? Date.now() + REQUEST_TIMEOUT_MS;
   const url = `${config.baseUrl}/chat/completions`;
   const baseBody = {
     model: config.model,
@@ -80,6 +107,11 @@ export async function chatCompletionText(
   };
 
   const attempt = async (withJsonFormat: boolean): Promise<string> => {
+    const remaining = deadlineAt - Date.now();
+    if (remaining <= 0) {
+      throw new AiError("AI request deadline exceeded");
+    }
+    const timeoutMs = Math.min(REQUEST_TIMEOUT_MS, Math.max(1_000, remaining));
     let res: Response;
     try {
       res = await fetch(url, {
@@ -93,7 +125,7 @@ export async function chatCompletionText(
             ? { ...baseBody, response_format: { type: "json_object" } }
             : baseBody,
         ),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
       throw new AiError(
@@ -122,7 +154,12 @@ export async function chatCompletionText(
     return content;
   };
 
-  return attempt(true);
+  await acquireAiSlot();
+  try {
+    return await attempt(true);
+  } finally {
+    releaseAiSlot();
+  }
 }
 
 /** Parse a model completion as a JSON object, tolerating code fences. */

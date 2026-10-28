@@ -17,10 +17,15 @@ import type {
  * milestone's acceptance criteria and computes the release fraction.
  *
  * Live mode: one structured chat call (prompts in ./prompts.ts) returning a
- * verdict per criterion. Two defences keep money safe:
+ * verdict per criterion. Three defences keep money safe:
  *   1. The prompt allows "pass" ONLY with concrete cited evidence.
- *   2. A post-check downgrades any "pass" whose evidence is missing, tiny,
- *      or generic praise ("looks good", "well done", ...) to "partial".
+ *   2. A code-side evidence gate (audit T-5) downgrades any "pass" OR
+ *      "partial" whose cited evidence is missing, generic praise, or NOT
+ *      FOUND in the actual deliverable text to "fail" — the model's word
+ *      alone never releases money, and neither do quotes fabricated by
+ *      the model or planted via prompt injection in the deliverable.
+ *   3. The deliverable reaches the model framed as untrusted data, never
+ *      as instructions (see prompts.ts).
  * A criterion the model returns no verdict for counts as "fail" — silence
  * never releases money. An unparseable response is a clean AiError/502.
  *
@@ -49,6 +54,51 @@ function isConcreteEvidence(evidence: string, criterionLabel: string): boolean {
     s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
   if (normalize(ev) === normalize(criterionLabel)) return false;
   return true;
+}
+
+/**
+ * Code-side evidence gate (audit T-5). The model's cited evidence is only
+ * believed when it can be FOUND in the actual deliverable text. Matching:
+ * both texts are normalised (lowercase, non-alphanumerics collapsed to
+ * single spaces, trimmed), then the evidence matches when EITHER
+ *   (a) the normalised evidence (length >= 12 chars) is a substring of the
+ *       normalised deliverable, OR
+ *   (b) fuzzy word-run match: the longest run of consecutive evidence
+ *       words that appears contiguously in the deliverable covers at
+ *       least 60% of the evidence's words AND is at least 4 words long.
+ * Anything else — invented quotes, paraphrases, quotes planted by prompt
+ * injection that do not come from the deliverable — does not match.
+ */
+export function evidenceMatchesDeliverable(
+  evidence: string,
+  deliverableContent: string,
+): boolean {
+  const normalize = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const ev = normalize(evidence);
+  const del = normalize(deliverableContent);
+  if (ev.length < 12 || !del) return false;
+  if (del.includes(ev)) return true;
+  const evWords = ev.split(" ");
+  const delWords = del.split(" ");
+  if (evWords.length < 4) return false;
+  // Longest contiguous run of evidence words present in the deliverable.
+  let best = 0;
+  for (let i = 0; i < evWords.length; i++) {
+    for (let j = 0; j < delWords.length; j++) {
+      if (evWords[i] !== delWords[j]) continue;
+      let run = 0;
+      while (
+        i + run < evWords.length &&
+        j + run < delWords.length &&
+        evWords[i + run] === delWords[j + run]
+      ) {
+        run++;
+      }
+      if (run > best) best = run;
+    }
+  }
+  return best >= 4 && best / evWords.length >= 0.6;
 }
 
 export async function verifyDeliverableWithAi(input: {
@@ -83,7 +133,7 @@ export async function verifyDeliverableWithAi(input: {
         deliverableContent: input.deliverableContent,
       }),
     },
-  ]);
+  ], { deadlineAt: Date.now() + 190_000 });
 
   const obj = parseJsonObject(raw);
   if (!Array.isArray(obj.criteria)) {
@@ -111,10 +161,23 @@ export async function verifyDeliverableWithAi(input: {
     const evidence = typeof entry.evidence === "string" ? entry.evidence.trim() : "";
     let reason = typeof entry.reason === "string" ? entry.reason.trim() : "";
 
-    if (status === "pass" && !isConcreteEvidence(evidence, c.label)) {
-      status = "partial";
-      reason =
-        `${reason} (Downgraded from pass: the cited evidence was not concrete.)`.trim();
+    // Evidence gate (audit T-5), enforced in code for pass AND partial:
+    // a paying verdict needs concrete evidence that is actually present
+    // in the deliverable. Failing either check downgrades to "fail", so
+    // fabricated quotes and prompt-injected verdicts release nothing.
+    let evidenceVerified = false;
+    if (status === "pass" || status === "partial") {
+      if (!isConcreteEvidence(evidence, c.label)) {
+        status = "fail";
+        reason =
+          `${reason} (Downgraded to fail by the code-side evidence gate: no concrete evidence was cited.)`.trim();
+      } else if (!evidenceMatchesDeliverable(evidence, input.deliverableContent)) {
+        status = "fail";
+        reason =
+          `${reason} (Downgraded to fail by the code-side evidence gate: the cited evidence was not found in the deliverable.)`.trim();
+      } else {
+        evidenceVerified = true;
+      }
     }
     return {
       criterionId: c.id,
@@ -123,6 +186,8 @@ export async function verifyDeliverableWithAi(input: {
       reason: evidence
         ? `${reason} Evidence: ${evidence}`.trim()
         : reason || "No reason given.",
+      evidence: evidence || undefined,
+      evidenceVerified,
     };
   });
 

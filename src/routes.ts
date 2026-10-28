@@ -8,12 +8,15 @@ import type { EscrowService } from "./services/escrow.ts";
 import {
   SETTING_KEYS,
   checkSetupToken,
+  isPrivateOrLoopbackHost,
   settingsStatus,
+  setupTokenRequired,
   writeSecretsFile,
   type SecretsFile,
   type SettingKey,
 } from "./settings.ts";
 import { httpError } from "./services/escrow.ts";
+import type { Contract, Milestone } from "./types.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const indexHtml = readFileSync(resolve(here, "../public/index.html"), "utf8");
@@ -31,6 +34,55 @@ interface SubmitBody {
   kind?: string;
   content: string;
 }
+
+// Audit K-1 (read side): public GET responses never carry the live PayPal
+// approval URL — that actionable link is returned ONLY in the direct
+// response to the actor performing the fund step. Everything else about
+// the contract stays public so judges can inspect the demo.
+function publicMilestone(m: Milestone): Milestone {
+  if (!m.approvalUrl) return m;
+  const copy = { ...m };
+  delete copy.approvalUrl;
+  return copy;
+}
+
+function publicContract(c: Contract): Contract {
+  return { ...c, milestones: c.milestones.map(publicMilestone) };
+}
+
+const createContractSchema = {
+  body: {
+    type: "object",
+    required: ["brief", "clientEmail", "freelancerEmail", "totalAmount"],
+    properties: {
+      brief: { type: "string", minLength: 1, maxLength: 10_000 },
+      clientEmail: { type: "string", minLength: 3, maxLength: 254 },
+      freelancerEmail: { type: "string", minLength: 3, maxLength: 254 },
+      totalAmount: { type: "number", minimum: 1, maximum: 1_000_000 },
+      currency: { type: "string", minLength: 3, maxLength: 3 },
+    },
+  },
+} as const;
+
+const submitSchema = {
+  body: {
+    type: "object",
+    required: ["content"],
+    properties: {
+      kind: { type: "string", enum: ["text", "link", "file"] },
+      content: { type: "string", minLength: 1, maxLength: 100_000 },
+    },
+  },
+} as const;
+
+/** Rate-limit presets (audit T-3), enforced per client IP. */
+const RL = {
+  settings: { max: 10, timeWindow: "1 minute" },
+  createContract: { max: 12, timeWindow: "1 minute" },
+  verify: { max: 20, timeWindow: "1 minute" },
+  milestoneWrite: { max: 30, timeWindow: "1 minute" },
+  webhook: { max: 120, timeWindow: "1 minute" },
+} as const;
 
 export function registerRoutes(
   app: FastifyInstance,
@@ -59,16 +111,21 @@ export function registerRoutes(
 
   // ------------------------------------------------------ connect/settings
   /**
-   * Setup-token gate for the settings surface. When PROOFPAY_SETUP_TOKEN
-   * is set, the token must arrive as the `x-setup-token` header or the
-   * `setup_token` query parameter; when unset, everything is allowed
-   * (local-demo default — server.ts logs a startup warning in that case).
+   * Setup-token gate for the settings API (audit T-2/T-4). The token is
+   * accepted ONLY as the `x-setup-token` header — never in a URL. The
+   * gate FAILS CLOSED: when PROOFPAY_SETUP_TOKEN is not configured the
+   * settings surface answers 503 instead of opening up.
    */
   const requireSetupToken = (req: FastifyRequest, reply: FastifyReply) => {
-    const query = (req.query ?? {}) as { setup_token?: string };
+    if (!setupTokenRequired()) {
+      reply.status(503).send({
+        error:
+          "settings are disabled: PROOFPAY_SETUP_TOKEN is not configured on the server",
+      });
+      return false;
+    }
     const ok = checkSetupToken({
       header: req.headers["x-setup-token"] as string | undefined,
-      query: query.setup_token,
     });
     if (!ok) {
       reply.status(401).send({ error: "setup token required" });
@@ -76,19 +133,27 @@ export function registerRoutes(
     return ok;
   };
 
-  app.get("/connect", async (req, reply) => {
-    if (!requireSetupToken(req, reply)) return reply;
+  // The /connect page itself is just a form — it contains no settings
+  // data, so it is served without the token (the operator types the token
+  // into it). Every byte of settings data and every settings write stays
+  // behind the header gate above.
+  app.get("/connect", async (_req, reply) => {
     return reply.type("text/html").send(connectHtml);
   });
 
   /** Safe status only — never any stored value (see settings.ts). */
-  app.get("/api/settings", async (req, reply) => {
-    if (!requireSetupToken(req, reply)) return reply;
-    return settingsStatus();
-  });
+  app.get(
+    "/api/settings",
+    { config: { rateLimit: RL.settings } },
+    async (req, reply) => {
+      if (!requireSetupToken(req, reply)) return reply;
+      return settingsStatus();
+    },
+  );
 
   app.post<{ Body: Record<string, unknown> }>(
     "/api/settings",
+    { config: { rateLimit: RL.settings } },
     async (req, reply) => {
       if (!requireSetupToken(req, reply)) return reply;
       const body = (req.body ?? {}) as Record<string, unknown>;
@@ -101,6 +166,14 @@ export function registerRoutes(
           throw httpError(400, `${key} must be a string`);
         }
         patch[key as SettingKey] = value;
+      }
+      // Audit S-8: PUBLIC_BASE_URL shapes PayPal return URLs, so it is
+      // deploy configuration only — not writable through this API.
+      if (patch.PUBLIC_BASE_URL !== undefined && patch.PUBLIC_BASE_URL.trim()) {
+        throw httpError(
+          400,
+          "PUBLIC_BASE_URL is managed by deployment configuration and cannot be changed here",
+        );
       }
       if (
         patch.PAYPAL_ENV !== undefined &&
@@ -116,8 +189,16 @@ export function registerRoutes(
         } catch {
           throw httpError(400, "AI_BASE_URL must be a valid URL");
         }
-        if (url.protocol !== "https:" && url.protocol !== "http:") {
-          throw httpError(400, "AI_BASE_URL must use http(s)");
+        // Audit S-8: the AI key is sent to this host — require https and
+        // refuse loopback/private/link-local targets (SSRF/exfiltration).
+        if (url.protocol !== "https:") {
+          throw httpError(400, "AI_BASE_URL must use https");
+        }
+        if (isPrivateOrLoopbackHost(url.hostname)) {
+          throw httpError(
+            400,
+            "AI_BASE_URL must not point at a private or loopback host",
+          );
         }
       }
       // The patch is applied to the secrets file; the response is the safe
@@ -129,21 +210,30 @@ export function registerRoutes(
   );
 
   // ------------------------------------------------------------- contracts
-  app.post<{ Body: ContractBody }>("/api/contracts", async (req) => {
-    const contract = await escrow.createContract(req.body ?? ({} as ContractBody));
-    return { contract };
-  });
+  app.post<{ Body: ContractBody }>(
+    "/api/contracts",
+    { schema: createContractSchema, config: { rateLimit: RL.createContract } },
+    async (req) => {
+      const contract = await escrow.createContract(req.body ?? ({} as ContractBody));
+      return { contract: publicContract(contract) };
+    },
+  );
 
-  app.get("/api/contracts", async () => ({ contracts: escrow.listContracts() }));
+  app.get("/api/contracts", async () => ({
+    contracts: escrow.listContracts().map(publicContract),
+  }));
 
   app.get<{ Params: { id: string } }>(
     "/api/contracts/:id",
-    async (req) => ({ contract: escrow.getContract(req.params.id) }),
+    async (req) => ({ contract: publicContract(escrow.getContract(req.params.id)) }),
   );
 
   // -------------------------------------------------- milestone lifecycle
+  // The fund response is the ONE place the live approvalUrl is returned:
+  // it goes directly to the actor performing the funding step (K-1).
   app.post<{ Params: { id: string; mid: string } }>(
     "/api/contracts/:id/milestones/:mid/fund",
+    { config: { rateLimit: RL.milestoneWrite } },
     async (req) => ({
       milestone: await escrow.fundMilestone(req.params.id, req.params.mid),
     }),
@@ -151,8 +241,11 @@ export function registerRoutes(
 
   app.post<{ Params: { id: string; mid: string } }>(
     "/api/contracts/:id/milestones/:mid/confirm-fund",
+    { config: { rateLimit: RL.milestoneWrite } },
     async (req) => ({
-      milestone: await escrow.confirmFunding(req.params.id, req.params.mid),
+      milestone: publicMilestone(
+        await escrow.confirmFunding(req.params.id, req.params.mid),
+      ),
     }),
   );
 
@@ -176,10 +269,10 @@ export function registerRoutes(
         await escrow.confirmFunding(contractId, milestoneId);
         return reply.redirect(`/?funded=${encodeURIComponent(milestoneId)}`);
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return reply.redirect(
-          `/?funding_error=${encodeURIComponent(message)}`,
-        );
+        // Audit R-3: internal error text stays in the server log; the
+        // browser only ever sees a fixed error code.
+        req.log.error(err, "funding confirmation failed");
+        return reply.redirect("/?funding_error=confirmation_failed");
       }
     },
   );
@@ -190,17 +283,21 @@ export function registerRoutes(
 
   app.post<{ Params: { id: string; mid: string }; Body: SubmitBody }>(
     "/api/contracts/:id/milestones/:mid/submit",
+    { schema: submitSchema, config: { rateLimit: RL.milestoneWrite } },
     async (req) => ({
-      milestone: escrow.submitDeliverable(
-        req.params.id,
-        req.params.mid,
-        req.body ?? ({} as SubmitBody),
+      milestone: publicMilestone(
+        await escrow.submitDeliverable(
+          req.params.id,
+          req.params.mid,
+          req.body ?? ({} as SubmitBody),
+        ),
       ),
     }),
   );
 
   app.post<{ Params: { id: string; mid: string } }>(
     "/api/contracts/:id/milestones/:mid/verify",
+    { config: { rateLimit: RL.verify } },
     async (req) => ({
       verification: await escrow.verifyMilestone(req.params.id, req.params.mid),
     }),
@@ -208,7 +305,14 @@ export function registerRoutes(
 
   app.post<{ Params: { id: string; mid: string } }>(
     "/api/contracts/:id/milestones/:mid/release",
-    async (req) => escrow.releaseMilestone(req.params.id, req.params.mid),
+    { config: { rateLimit: RL.milestoneWrite } },
+    async (req) => {
+      const result = await escrow.releaseMilestone(req.params.id, req.params.mid);
+      return {
+        ...result,
+        milestone: publicMilestone(result.milestone),
+      };
+    },
   );
 
   // ---------------------------------------------------------------- ledger
@@ -219,37 +323,62 @@ export function registerRoutes(
 
   // --------------------------------------------------------------- webhooks
   /**
-   * PayPal webhook intake. Records the raw event in the ledger (against the
-   * contract referenced in the event when identifiable, otherwise under the
-   * "unmatched" bucket) so payment state can be reconciled later.
+   * PayPal webhook intake. Records the event in the ledger (against the
+   * contract referenced in the event when identifiable, otherwise under
+   * the "unmatched" bucket) so payment state can be reconciled later.
+   *
+   * Audit S-1: in live PayPal mode an event whose signature verification
+   * does not succeed is REJECTED (401) and never recorded — the ledger is
+   * evidence and must not be poisonable by unauthenticated posts. Events
+   * are deduplicated by event id. (In mock mode there is nothing to
+   * verify against, so events are recorded with verified: null.)
    */
-  app.post("/api/webhooks/paypal", async (req) => {
-    const event = (req.body ?? {}) as {
-      id?: string;
-      event_type?: string;
-      resource?: { supplementary_data?: { related_ids?: { order_id?: string } } };
-    };
-    const headers: Record<string, string | undefined> = {
-      "paypal-auth-algo": req.headers["paypal-auth-algo"] as string | undefined,
-      "paypal-cert-url": req.headers["paypal-cert-url"] as string | undefined,
-      "paypal-transmission-id": req.headers["paypal-transmission-id"] as
-        | string
-        | undefined,
-      "paypal-transmission-sig": req.headers["paypal-transmission-sig"] as
-        | string
-        | undefined,
-      "paypal-transmission-time": req.headers["paypal-transmission-time"] as
-        | string
-        | undefined,
-    };
-    const { verified } = await paypal.verifyWebhookSignature({ headers, event });
-    const orderId = event.resource?.supplementary_data?.related_ids?.order_id;
-    const contract = orderId
-      ? escrow
-          .listContracts()
-          .find((c) => c.milestones.some((m) => m.paypalOrderId === orderId))
-      : undefined;
-    escrow.recordWebhook(contract?.id ?? "unmatched", event, verified);
-    return { received: true, verified };
-  });
+  app.post(
+    "/api/webhooks/paypal",
+    { config: { rateLimit: RL.webhook } },
+    async (req, reply) => {
+      const event = (req.body ?? {}) as {
+        id?: string;
+        event_type?: string;
+        resource?: { supplementary_data?: { related_ids?: { order_id?: string } } };
+      };
+      const headers: Record<string, string | undefined> = {
+        "paypal-auth-algo": req.headers["paypal-auth-algo"] as string | undefined,
+        "paypal-cert-url": req.headers["paypal-cert-url"] as string | undefined,
+        "paypal-transmission-id": req.headers["paypal-transmission-id"] as
+          | string
+          | undefined,
+        "paypal-transmission-sig": req.headers["paypal-transmission-sig"] as
+          | string
+          | undefined,
+        "paypal-transmission-time": req.headers["paypal-transmission-time"] as
+          | string
+          | undefined,
+      };
+      const { verified } = await paypal.verifyWebhookSignature({ headers, event });
+      if (paypal.mode === "live" && verified !== true) {
+        reply.status(401);
+        return { received: false, verified };
+      }
+      if (event.id) {
+        const duplicate = escrow.listEvents().some((e) => {
+          if (e.type !== "webhook_received") return false;
+          const d = e.detail as {
+            event?: { id?: string };
+            eventId?: string | null;
+          };
+          return d.event?.id === event.id || d.eventId === event.id;
+        });
+        if (duplicate) return { received: true, verified, deduplicated: true };
+      }
+      const orderId = event.resource?.supplementary_data?.related_ids?.order_id;
+      const contract = orderId
+        ? escrow
+            .listContracts()
+            .find((c) => c.milestones.some((m) => m.paypalOrderId === orderId))
+        : undefined;
+      escrow.recordWebhook(contract?.id ?? "unmatched", event, verified);
+      return { received: true, verified };
+    },
+  );
 }

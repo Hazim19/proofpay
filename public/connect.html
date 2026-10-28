@@ -37,7 +37,8 @@
   <input id="setupToken" type="password" autocomplete="off"
          placeholder="Required by this deployment" />
   <div class="hint">This deployment sets <code>PROOFPAY_SETUP_TOKEN</code>;
-    the token is required to view or change these settings.</div>
+    paste the token here to view or change these settings. It is sent as a
+    request header only — never put it in a URL.</div>
 </fieldset>
 
 <form id="connectForm">
@@ -85,9 +86,14 @@
 <p class="hint"><a href="/">← back to the ProofPay demo</a></p>
 
 <script>
-  const params = new URLSearchParams(location.search);
+  // The setup token is typed (or pasted) into the field and sent ONLY as
+  // the x-setup-token header — it never travels in a URL. If a legacy
+  // link still carries ?setup_token=, scrub it from the address bar and
+  // history immediately and do not use it.
+  if (new URLSearchParams(location.search).has("setup_token")) {
+    history.replaceState(null, "", location.pathname);
+  }
   const tokenInput = document.getElementById("setupToken");
-  if (params.get("setup_token")) tokenInput.value = params.get("setup_token");
 
   const headers = () => {
     const h = { "Content-Type": "application/json" };
@@ -96,10 +102,21 @@
     return h;
   };
 
+  // Built with textContent/DOM nodes only (no innerHTML): status values
+  // such as the AI model name are operator-controlled strings and must
+  // never be parsed as markup in this credential page.
   const mark = (el, st, extra = "") => {
-    el.innerHTML = st.configured
-      ? `<span class="ok">configured</span> (from ${st.source})${extra}`
-      : `<span class="no">not configured</span>`;
+    el.textContent = "";
+    const span = document.createElement("span");
+    if (st.configured) {
+      span.className = "ok";
+      span.textContent = "configured";
+      el.append(span, document.createTextNode(` (from ${st.source})${extra}`));
+    } else {
+      span.className = "no";
+      span.textContent = "not configured";
+      el.append(span);
+    }
   };
 
   async function loadStatus() {
@@ -108,6 +125,12 @@
       document.getElementById("tokenBox").hidden = false;
       document.getElementById("msg").textContent =
         "A setup token is required — enter it above, then press Save.";
+      return null;
+    }
+    if (!res.ok) {
+      document.getElementById("tokenBox").hidden = false;
+      document.getElementById("msg").textContent =
+        "Settings are unavailable on this deployment (the server has no setup token configured).";
       return null;
     }
     const s = await res.json();

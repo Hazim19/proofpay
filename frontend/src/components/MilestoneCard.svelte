@@ -113,6 +113,26 @@
             kind: "done",
             text: "Settled — the register entry is complete; no further action.",
           };
+        case "funding":
+          return {
+            kind: "note",
+            text: "The funding hold is being placed with PayPal — a moment, then refresh.",
+          };
+        case "releasing":
+          return role === "client"
+            ? {
+                kind: "action",
+                text: "A settlement was interrupted — release again to resume it exactly where it stopped.",
+              }
+            : {
+                kind: "note",
+                text: "Settlement is in progress — the client resumes it if it was interrupted. Switch roles above to act as the client.",
+              };
+        case "settlement_failed":
+          return {
+            kind: "note",
+            text: `Settlement failed permanently${m.settlementError ? `: ${m.settlementError}` : ""} — the captured funds are fully accounted for in the ledger below and need operator handling.`,
+          };
         default:
           return null;
       }
@@ -152,12 +172,12 @@
         Submit the deliverable for examination
       </ActionButton>
     {/if}
-    {#if m.status === "submitted"}
+    {#if m.status === "submitted" && !m.verification}
       <ActionButton variant="secondary" anyBusy={busy} working={myBusy} workingLabel="Examining" onclick={() => onAction(contract.id, m.id, "verify")}>
         Verify with AI
       </ActionButton>
     {/if}
-    {#if role === "client" && m.verification && m.status !== "released"}
+    {#if role === "client" && m.verification && m.verification.releaseFraction > 0 && (m.status === "submitted" || m.status === "releasing")}
       <ActionButton variant="release" anyBusy={busy} working={myBusy} workingLabel="Releasing" onclick={() => onAction(contract.id, m.id, "release")}>
         Release per verification
       </ActionButton>

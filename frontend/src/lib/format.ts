@@ -54,6 +54,12 @@ export function stepperStates(m: Milestone): StepState[] {
       return ["done", "done", "done", "fail", "todo"];
     case "released":
       return ["done", "done", "done", "done", "done"];
+    case "funding":
+      return ["done", "current", "todo", "todo", "todo"];
+    case "releasing":
+      return ["done", "done", "done", "done", "current"];
+    case "settlement_failed":
+      return ["done", "done", "done", "done", "fail"];
     default:
       return ["current", "todo", "todo", "todo", "todo"];
   }
@@ -151,6 +157,12 @@ export function milestoneStateLabel(m: Milestone): string {
         : "Submitted — under examination";
     case "released":
       return "Settled — released";
+    case "funding":
+      return "Funding — placing the hold";
+    case "releasing":
+      return "Settling — release in progress";
+    case "settlement_failed":
+      return "Settlement failed — operator action needed";
     case "failed":
       return "Examination failed — funds held";
     default:

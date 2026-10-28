@@ -182,8 +182,11 @@ export class PayPalClient {
       body: "grant_type=client_credentials",
     });
     if (!res.ok) {
+      const body = await res.text();
+      // Audit R-3: never forward the full upstream body to API callers.
+      console.error(`PayPal token request failed: ${res.status} ${body}`);
       throw new Error(
-        `PayPal token request failed: ${res.status} ${await res.text()}`,
+        `PayPal token request failed: ${res.status} ${body.slice(0, 200)}`,
       );
     }
     const data = (await res.json()) as {
@@ -199,22 +202,31 @@ export class PayPalClient {
 
   private async api<T>(
     path: string,
-    init: { method?: string; body?: unknown } = {},
+    init: { method?: string; body?: unknown; requestId?: string } = {},
   ): Promise<T> {
     const token = await this.getAccessToken();
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+    // Audit K-2: PayPal-Request-Id makes POSTs idempotent — a retry with
+    // the same id returns the original result instead of acting twice.
+    if (init.requestId) headers["PayPal-Request-Id"] = init.requestId;
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: init.method ?? "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
     });
     const text = await res.text();
     const json = text ? (JSON.parse(text) as T) : ({} as T);
     if (!res.ok) {
-      throw new Error(
+      // Audit R-3: full upstream body goes to the server log only; the
+      // thrown error (which can reach API callers) is truncated.
+      console.error(
         `PayPal API ${init.method ?? "GET"} ${path} failed: ${res.status} ${text}`,
+      );
+      throw new Error(
+        `PayPal API ${init.method ?? "GET"} ${path} failed: ${res.status} ${text.slice(0, 200)}`,
       );
     }
     return json;
@@ -269,6 +281,9 @@ export class PayPalClient {
       [key: string]: unknown;
     }>("/v2/checkout/orders", {
       method: "POST",
+      requestId: input.fundingContext
+        ? `${input.fundingContext.milestoneId}-order`
+        : undefined,
       body: {
         intent: "AUTHORIZE",
         purchase_units: [
@@ -361,6 +376,7 @@ export class PayPalClient {
     amount?: number;
     currency: string;
     finalCapture?: boolean;
+    requestId?: string;
   }): Promise<CaptureResult> {
     this.refreshConfig();
     if (this.config.mode === "mock") {
@@ -382,7 +398,7 @@ export class PayPalClient {
     }
     const raw = await this.api<{ id: string; status: string }>(
       `/v2/payments/authorizations/${input.authorizationId}/capture`,
-      { method: "POST", body },
+      { method: "POST", body, requestId: input.requestId },
     );
     return { captureId: raw.id, status: raw.status, raw };
   }
@@ -393,6 +409,7 @@ export class PayPalClient {
     amount?: number;
     currency: string;
     note?: string;
+    requestId?: string;
   }): Promise<RefundResult> {
     this.refreshConfig();
     if (this.config.mode === "mock") {
@@ -413,7 +430,7 @@ export class PayPalClient {
     if (input.note) body.note_to_payer = input.note;
     const raw = await this.api<{ id: string; status: string }>(
       `/v2/payments/captures/${input.captureId}/refund`,
-      { method: "POST", body },
+      { method: "POST", body, requestId: input.requestId },
     );
     return { refundId: raw.id, status: raw.status, raw };
   }
@@ -442,6 +459,9 @@ export class PayPalClient {
       batch_header: { payout_batch_id: string; batch_status: string };
     }>("/v1/payments/payouts", {
       method: "POST",
+      // Deterministic per milestone: a retried release re-presents the
+      // same request id and PayPal returns the original batch (audit T-10).
+      requestId: `${input.senderItemId}-payout`,
       body: {
         sender_batch_header: {
           sender_batch_id: input.senderItemId,
@@ -462,6 +482,31 @@ export class PayPalClient {
         ],
       },
     });
+    return {
+      payoutBatchId: raw.batch_header.payout_batch_id,
+      batchStatus: raw.batch_header.batch_status,
+      raw,
+    };
+  }
+
+  /**
+   * Fetch a payout batch's current status (audit T-10 reconciliation):
+   * used on a release retry to adopt/refresh a batch whose creation
+   * response was seen but whose state may have moved on since.
+   */
+  async getPayoutBatch(payoutBatchId: string): Promise<PayoutResult> {
+    this.refreshConfig();
+    if (this.config.mode === "mock") {
+      return {
+        payoutBatchId,
+        batchStatus: "SUCCESS",
+        mock: true,
+        raw: { note: "deterministic mock payout batch" },
+      };
+    }
+    const raw = await this.api<{
+      batch_header: { payout_batch_id: string; batch_status: string };
+    }>(`/v1/payments/payouts/${payoutBatchId}`);
     return {
       payoutBatchId: raw.batch_header.payout_batch_id,
       batchStatus: raw.batch_header.batch_status,

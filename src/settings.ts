@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import {
   chmodSync,
   existsSync,
@@ -111,22 +112,51 @@ export function resolveSetting(key: SettingKey): string | undefined {
 
 // ------------------------------------------------------------ setup token
 /**
- * The /connect page and the settings API are guarded by a setup token when
- * PROOFPAY_SETUP_TOKEN is set (header `x-setup-token` or `?setup_token=`).
- * When it is unset the page is open — the local-demo default — and the
- * server logs a loud warning at startup (see server.ts).
+ * The settings API is guarded by a setup token, sent ONLY as the
+ * `x-setup-token` header (audit T-2: tokens must never travel in URLs,
+ * where they leak into server logs, browser history and Referer headers).
+ * The gate FAILS CLOSED (audit T-4): when PROOFPAY_SETUP_TOKEN is not set,
+ * `checkSetupToken` never returns true and the routes answer 503 — a
+ * redeploy that loses the env var can no longer open the settings surface
+ * silently. The /connect HTML form itself carries no data and stays
+ * reachable so the operator can type the token into it.
  */
 export function setupTokenRequired(): boolean {
   return Boolean(process.env.PROOFPAY_SETUP_TOKEN?.trim());
 }
 
-export function checkSetupToken(input: {
-  header?: string;
-  query?: string;
-}): boolean {
+export function checkSetupToken(input: { header?: string }): boolean {
   const expected = process.env.PROOFPAY_SETUP_TOKEN?.trim();
-  if (!expected) return true;
-  return input.header === expected || input.query === expected;
+  if (!expected) return false; // fail closed
+  const provided = input.header ?? "";
+  // Constant-time comparison (audit R-1): hash both sides so the compare
+  // itself is length-independent, then timingSafeEqual.
+  const a = createHash("sha256").update(provided).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
+// ------------------------------------------------- outbound URL safety
+/**
+ * True when a hostname points at loopback / private / link-local space
+ * (audit S-8): an AI_BASE_URL aimed there would make the server send the
+ * AI API key to an internal target (SSRF / credential exfiltration).
+ */
+export function isPrivateOrLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  if (host === "::1" || host === "::") return true;
+  if (host.startsWith("fe80:")) return true; // IPv6 link-local
+  if (/^f[cd][0-9a-f]{2}:/.test(host)) return true; // IPv6 unique-local fc00::/7
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    if (a === 127 || a === 10 || a === 0) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true; // link-local / cloud metadata
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------- status
@@ -136,7 +166,6 @@ export interface SettingStatus {
 }
 
 export interface SettingsStatus {
-  secretsFile: string;
   setupTokenRequired: boolean;
   paypal: {
     clientId: SettingStatus & { last4: string | null };
@@ -164,7 +193,7 @@ export function settingsStatus(): SettingsStatus {
   };
   const clientId = resolveSetting("PAYPAL_CLIENT_ID");
   return {
-    secretsFile: secretsFilePath(),
+    // Audit R-4: the absolute secrets-file path is no longer disclosed.
     setupTokenRequired: setupTokenRequired(),
     paypal: {
       clientId: {

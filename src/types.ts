@@ -4,10 +4,13 @@ export type CriterionStatus = "pass" | "partial" | "fail";
 
 export type MilestoneStatus =
   | "draft" // created, not yet funded
+  | "funding" // fund call in flight (order being created); guards concurrent funds
   | "awaiting_approval" // live mode: PayPal order created, waiting for the client to approve it in PayPal Checkout
   | "funded" // money authorized (held) via PayPal
   | "submitted" // freelancer delivered work
+  | "releasing" // release in flight (or interrupted mid-settlement; resumable)
   | "released" // verified funds captured + paid out
+  | "settlement_failed" // captured, but the payout failed permanently; operator attention required
   | "failed"; // verification failed, funds still held, awaiting revision
 
 export interface Criterion {
@@ -30,6 +33,13 @@ export interface CriterionResult {
   label: string;
   status: CriterionStatus;
   reason: string;
+  /** The evidence quote the verifier cited for this criterion, when any. */
+  evidence?: string;
+  /**
+   * Set by the code-side evidence gate (never by the model): true when the
+   * cited evidence was matched verbatim/fuzzily inside the deliverable.
+   */
+  evidenceVerified?: boolean;
 }
 
 export interface VerificationReport {
@@ -57,6 +67,10 @@ export interface Milestone {
   paypalCaptureId?: string;
   paypalRefundId?: string;
   paypalPayoutBatchId?: string;
+  /** True once a payout creation has been attempted for the current release. */
+  payoutAttempted?: boolean;
+  /** Human-readable terminal settlement problem (status settlement_failed). */
+  settlementError?: string;
   deliverable?: Deliverable;
   verification?: VerificationReport;
 }

@@ -95,7 +95,10 @@ export async function draftContract(input: DraftInput): Promise<DraftResult> {
     },
   ];
 
-  const raw = await chatCompletionText(config, messages);
+  // Audit S-10: the initial call and the repair call share ONE deadline
+  // (4 minutes total) instead of each getting a fresh per-attempt budget.
+  const deadlineAt = Date.now() + 240_000;
+  const raw = await chatCompletionText(config, messages, { deadlineAt });
   try {
     return validateDraft(raw, input);
   } catch (firstErr) {
@@ -106,7 +109,7 @@ export async function draftContract(input: DraftInput): Promise<DraftResult> {
       ...messages,
       { role: "assistant", content: raw },
       { role: "user", content: buildDrafterRepairMessage(firstErr.message) },
-    ]);
+    ], { deadlineAt });
     try {
       return validateDraft(repaired, input);
     } catch (secondErr) {

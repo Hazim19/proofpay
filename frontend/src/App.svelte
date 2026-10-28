@@ -160,6 +160,20 @@
     });
   }
 
+  /** Only ever hand the browser to a real PayPal approval URL
+      (https + a paypal.com host); anything else is treated as no URL. */
+  function isPayPalApprovalUrl(raw: string): boolean {
+    try {
+      const u = new URL(raw);
+      return (
+        u.protocol === "https:" &&
+        (u.hostname === "paypal.com" || u.hostname.endsWith(".paypal.com"))
+      );
+    } catch {
+      return false;
+    }
+  }
+
   /** Live mode returns an approvalUrl: redirect to PayPal Checkout
       (PayPal sends the browser back to /fund/return afterwards). Mock
       mode funds instantly and the page simply refreshes. */
@@ -170,7 +184,11 @@
         {},
       );
       const m = json.milestone;
-      if (m?.approvalUrl && health?.paypalMode === "live") {
+      if (
+        m?.approvalUrl &&
+        health?.paypalMode === "live" &&
+        isPayPalApprovalUrl(m.approvalUrl)
+      ) {
         window.location.href = m.approvalUrl;
         return;
       }
@@ -222,7 +240,7 @@
       };
     } else if (params.get("funding_error")) {
       notice = {
-        text: "Funding could not be confirmed: " + params.get("funding_error"),
+        text: "Funding could not be confirmed. If you completed the PayPal approval, use the milestone's Confirm funding button to finish it.",
         error: true,
       };
     } else if (params.get("funding_cancelled")) {

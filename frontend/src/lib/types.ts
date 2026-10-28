@@ -4,10 +4,13 @@ export type CriterionStatus = "pass" | "partial" | "fail";
 
 export type MilestoneStatus =
   | "draft"
+  | "funding"
   | "awaiting_approval"
   | "funded"
   | "submitted"
+  | "releasing"
   | "released"
+  | "settlement_failed"
   | "failed";
 
 export interface Criterion {
@@ -52,6 +55,8 @@ export interface Milestone {
   paypalCaptureId?: string;
   paypalRefundId?: string;
   paypalPayoutBatchId?: string;
+  payoutAttempted?: boolean;
+  settlementError?: string;
   deliverable?: Deliverable;
   verification?: VerificationReport;
 }
