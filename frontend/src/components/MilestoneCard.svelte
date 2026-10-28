@@ -3,6 +3,7 @@
   import { findingLabel, milestoneStateLabel, money } from "../lib/format.ts";
   import Stepper from "./Stepper.svelte";
   import VerdictPanel from "./VerdictPanel.svelte";
+  import ActionButton from "./ActionButton.svelte";
 
   let {
     contract,
@@ -44,7 +45,79 @@
   const key = $derived(`${contract.id}:${m.id}`);
   const busy = $derived(busyKey !== null);
   const myBusy = $derived(busyKey?.startsWith(key + ":") ?? false);
-  const label = (base: string) => (myBusy ? "Working…" : base);
+
+  /* One "Next —" line per state + role (§11 rules 6–7): the next step is
+     always stated in words, attached to its button. When the step belongs
+     to the other role, a quiet note says so instead of a dead button. */
+  const next = $derived.by(
+    (): { kind: "action" | "note" | "done"; text: string } | null => {
+      const amt = money(m.amount, m.currency);
+      switch (m.status) {
+        case "draft":
+          return role === "client"
+            ? {
+                kind: "action",
+                text: `Fund this milestone to hold ${amt} in escrow.`,
+              }
+            : {
+                kind: "note",
+                text: "This step belongs to the client — funding comes first. Switch roles above to act as the client.",
+              };
+        case "awaiting_approval":
+          return role === "client"
+            ? {
+                kind: "action",
+                text: "Confirm the funding, now that PayPal approval is complete.",
+              }
+            : {
+                kind: "note",
+                text: "This step belongs to the client — the funding confirmation comes next. Switch roles above to act as the client.",
+              };
+        case "funded":
+          return role === "freelancer"
+            ? {
+                kind: "action",
+                text: "Paste the delivery in the panel above, then submit it for examination.",
+              }
+            : {
+                kind: "note",
+                text: "This step belongs to the freelancer — the delivery comes next. Switch roles above to act as the freelancer.",
+              };
+        case "failed":
+          return role === "freelancer"
+            ? {
+                kind: "action",
+                text: "Revise the delivery in the panel above, then resubmit it for a fresh examination.",
+              }
+            : {
+                kind: "note",
+                text: "This step belongs to the freelancer — a revised delivery comes next. Switch roles above to act as the freelancer.",
+              };
+        case "submitted":
+          if (!m.verification)
+            return {
+              kind: "action",
+              text: "Run the AI examination of the delivery.",
+            };
+          return role === "client"
+            ? {
+                kind: "action",
+                text: "Release the earned share, per the verdict recorded below.",
+              }
+            : {
+                kind: "note",
+                text: "The verdict is recorded below — settlement belongs to the client. Switch roles above to act as the client.",
+              };
+        case "released":
+          return {
+            kind: "done",
+            text: "Settled — the register entry is complete; no further action.",
+          };
+        default:
+          return null;
+      }
+    },
+  );
 </script>
 
 <div class="milestone" id="milestone-{m.id}">
@@ -56,31 +129,38 @@
 
   <Stepper {milestone} />
 
+  {#if next}
+    <div class="next-step {next.kind}">
+      <span class="ns-tag">{next.kind === "done" ? "Complete" : "Next"}</span>
+      <span class="ns-text">{next.text}</span>
+    </div>
+  {/if}
+
   <div class="ms-actions">
     {#if role === "client" && m.status === "draft"}
-      <button class="action" disabled={busy} onclick={() => onFund(contract.id, m.id)}>
-        {label("Fund (authorize via PayPal)")}
-      </button>
+      <ActionButton anyBusy={busy} working={myBusy} workingLabel="Authorising" onclick={() => onFund(contract.id, m.id)}>
+        Fund (authorize via PayPal)
+      </ActionButton>
     {/if}
     {#if role === "client" && m.status === "awaiting_approval"}
-      <button class="action" disabled={busy} onclick={() => onAction(contract.id, m.id, "confirm-fund")}>
-        {label("Confirm funding (after PayPal approval)")}
-      </button>
+      <ActionButton anyBusy={busy} working={myBusy} workingLabel="Confirming" onclick={() => onAction(contract.id, m.id, "confirm-fund")}>
+        Confirm funding (after PayPal approval)
+      </ActionButton>
     {/if}
     {#if role === "freelancer" && (m.status === "funded" || m.status === "failed")}
-      <button class="action" disabled={busy} onclick={() => onSubmit(contract.id, m.id)}>
-        {label("Submit deliverable")}
-      </button>
+      <ActionButton anyBusy={busy} working={myBusy} workingLabel="Submitting" onclick={() => onSubmit(contract.id, m.id)}>
+        Submit deliverable
+      </ActionButton>
     {/if}
     {#if m.status === "submitted"}
-      <button class="action secondary" disabled={busy} onclick={() => onAction(contract.id, m.id, "verify")}>
-        {label("Verify with AI")}
-      </button>
+      <ActionButton variant="secondary" anyBusy={busy} working={myBusy} workingLabel="Examining" onclick={() => onAction(contract.id, m.id, "verify")}>
+        Verify with AI
+      </ActionButton>
     {/if}
     {#if role === "client" && m.verification && m.status !== "released"}
-      <button class="action release" disabled={busy} onclick={() => onAction(contract.id, m.id, "release")}>
-        {label("Release per verification")}
-      </button>
+      <ActionButton variant="release" anyBusy={busy} working={myBusy} workingLabel="Releasing" onclick={() => onAction(contract.id, m.id, "release")}>
+        Release per verification
+      </ActionButton>
     {/if}
   </div>
 
@@ -191,6 +271,42 @@
   }
   .ms-actions:empty {
     display: none;
+  }
+
+  /* ------------------------------------------------ next-step guidance */
+  .next-step {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .next-step .ns-tag {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 3px 8px;
+    background: var(--ink);
+    color: var(--paper);
+    white-space: nowrap;
+  }
+  .next-step.note .ns-tag {
+    background: transparent;
+    color: var(--faint);
+    border: 1px solid var(--rule);
+  }
+  .next-step.done .ns-tag {
+    background: var(--green);
+  }
+  .next-step .ns-text {
+    font-style: italic;
+    font-size: 16.5px;
+    color: var(--ink-soft);
+  }
+  .next-step.note .ns-text {
+    color: var(--faint);
+    font-size: 15.5px;
   }
 
   /* ------------------------------------------------ examination table */

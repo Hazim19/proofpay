@@ -75,7 +75,7 @@
     --ag-border-color: var(--rule);
     --ag-row-border-color: var(--rule);
     --ag-odd-row-background-color: var(--paper);
-    --ag-row-hover-color: rgba(30, 86, 49, 0.05);
+    --ag-row-hover-color: rgba(30, 86, 49, 0.08);
     --ag-selected-row-background-color: rgba(30, 86, 49, 0.08);
     --ag-cell-horizontal-padding: 14px;
     --ag-header-height: 40px;

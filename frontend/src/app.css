@@ -149,13 +149,37 @@ body {
   border: none;
   padding: 9px 16px;
   cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.12s ease;
 }
 .switch button + button {
   border-left: 1px solid var(--rule-dark);
 }
+.switch button:not(.active):hover {
+  background: var(--paper-deep);
+}
+.switch button:active {
+  transform: translateY(1px);
+}
 .switch button.active {
   background: var(--ink);
   color: var(--paper);
+}
+.switch button:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.role-note {
+  margin: 12px 0 0;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--faint);
+}
+.role-note b {
+  color: var(--ink);
+  font-weight: 600;
 }
 .regnav {
   display: flex;
@@ -168,12 +192,20 @@ body {
   letter-spacing: 0.16em;
   font-size: 11.5px;
   color: var(--faint);
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 4px;
+  transition:
+    color 0.15s ease,
+    text-decoration-color 0.15s ease;
 }
 .regnav a:hover {
-  color: var(--ink);
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  color: var(--green);
+  text-decoration-color: var(--green);
+}
+.regnav a:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
 }
 
 /* --------------------------------------------------------------- notice */
@@ -317,12 +349,26 @@ textarea {
   border-bottom: 1px solid var(--rule-dark);
   border-radius: 0;
   padding: 7px 2px 8px;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+input:hover,
+textarea:hover {
+  border-bottom-color: var(--ink-soft);
 }
 input:focus,
 textarea:focus {
   outline: none;
-  border-bottom: 2px solid var(--ink);
+  border-bottom: 2px solid var(--green);
+  background: rgba(30, 86, 49, 0.045);
   padding-bottom: 7px;
+}
+input::placeholder,
+textarea::placeholder {
+  font-style: italic;
+  color: var(--faint);
+  opacity: 0.85;
 }
 textarea {
   resize: vertical;
@@ -330,6 +376,10 @@ textarea {
 }
 
 /* -------------------------------------------------------------- buttons */
+/* Full state system in the print language (§11): solid block + arrow at
+   rest, colour shift or full inversion on hover, press-shift on active,
+   double-rule green focus, ruled hatch when unavailable, working label
+   with animated ellipsis while its own call is running. */
 button.action {
   margin-top: 20px;
   font-family: var(--mono);
@@ -343,16 +393,31 @@ button.action {
   border-radius: 2px;
   padding: 11px 18px;
   cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease;
+}
+button.action .arr {
+  margin-left: 9px;
+  font-weight: 400;
 }
 button.action:hover:not(:disabled) {
-  background: #000;
+  background: var(--green);
+  border-color: var(--green);
+}
+button.action:active:not(:disabled) {
+  transform: translateY(1px);
 }
 button.action.secondary {
   background: transparent;
   color: var(--ink);
 }
 button.action.secondary:hover:not(:disabled) {
-  background: rgba(27, 23, 18, 0.06);
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
 }
 button.action.release {
   background: var(--green);
@@ -360,10 +425,55 @@ button.action.release {
 }
 button.action.release:hover:not(:disabled) {
   background: #17492a;
+  border-color: #17492a;
+}
+button.action:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
 }
 button.action:disabled {
-  opacity: 0.5;
-  cursor: wait;
+  background-color: var(--paper-deep);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(27, 23, 18, 0.1) 0,
+    rgba(27, 23, 18, 0.1) 1px,
+    transparent 1px,
+    transparent 7px
+  );
+  color: var(--faint);
+  border-color: var(--rule);
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+button.action.working {
+  background-color: var(--ink);
+  background-image: none;
+  color: var(--paper);
+  border-color: var(--ink);
+  cursor: progress;
+  opacity: 1;
+}
+button.action.release.working {
+  background-color: var(--green);
+  border-color: var(--green);
+}
+button.action .ell::after {
+  content: "…";
+  animation: ell 1.1s steps(1, end) infinite;
+}
+@keyframes ell {
+  0% {
+    content: "";
+  }
+  30% {
+    content: ".";
+  }
+  55% {
+    content: "..";
+  }
+  80% {
+    content: "...";
+  }
 }
 .ms-actions button.action {
   margin-top: 0;
@@ -382,9 +492,32 @@ button.action:disabled {
   letter-spacing: 0.18em;
   font-size: 11.5px;
   color: var(--faint);
+  list-style: none;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 4px;
+  transition:
+    color 0.15s ease,
+    text-decoration-color 0.15s ease;
+}
+.appendix summary::-webkit-details-marker {
+  display: none;
+}
+.appendix summary::before {
+  content: "+ ";
+  font-weight: 600;
+  color: var(--ink);
+}
+.appendix[open] summary::before {
+  content: "− ";
 }
 .appendix summary:hover {
-  color: var(--ink);
+  color: var(--green);
+  text-decoration-color: var(--green);
+}
+.appendix summary:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
 }
 .appendix pre {
   background: var(--paper-deep);
@@ -456,5 +589,19 @@ button.action:disabled {
   .sec-head {
     flex-direction: column;
     gap: 4px;
+  }
+}
+
+/* -------------------------------------------------- reduced motion (§11) */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

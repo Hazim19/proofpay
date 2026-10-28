@@ -54,8 +54,12 @@
     color: var(--green);
   }
   .stage.current .stage-label {
-    color: var(--ink);
+    color: var(--paper);
+    background: var(--ink);
     font-weight: 600;
+    display: inline-block;
+    padding: 2px 8px 3px;
+    margin-top: 4px;
   }
   .stage.fail .stage-label {
     color: var(--red);

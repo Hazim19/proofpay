@@ -79,13 +79,31 @@
     padding-top: 34px;
   }
   .stamp {
+    --rot: -3.5deg;
     border: 3px double var(--stamp);
     color: var(--stamp);
     padding: 24px 28px 20px;
-    transform: rotate(-3.5deg);
+    transform: rotate(var(--rot));
     text-align: center;
     max-width: 440px;
     background: rgba(154, 59, 38, 0.03);
+    /* Settle-in like a stamp being pressed, once, when the verdict
+       first renders (§11 rule 9). */
+    animation: stamp-press 0.35s cubic-bezier(0.2, 1.2, 0.35, 1) both;
+  }
+  @keyframes stamp-press {
+    0% {
+      transform: rotate(-10deg) scale(1.55);
+      opacity: 0;
+    }
+    60% {
+      transform: rotate(calc(var(--rot) - 1deg)) scale(0.97);
+      opacity: 1;
+    }
+    100% {
+      transform: rotate(var(--rot)) scale(1);
+      opacity: 1;
+    }
   }
   .stamp.pass {
     border-color: var(--green);
@@ -174,7 +192,12 @@
       gap: 30px;
     }
     .stamp {
-      transform: rotate(-2deg);
+      --rot: -2deg;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .stamp {
+      animation: none;
     }
   }
 </style>

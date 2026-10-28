@@ -332,3 +332,87 @@ kecil diterapkan ke build Svelte (eyebrow lavender + headline hero lebih
 besar); sisanya dilewati dengan alasan di atas. Tidak ada kode/aset
 template yang dibeli, diunduh, atau disalin — inspirasi visual saja,
 diimplementasikan dengan kode sendiri.
+
+## 11. Kejelasan interaksi (affordance) — ditambahkan 2026-10-28
+
+Pemicu: pengguna mencoba demo live dan tidak bisa menebak apa yang bisa
+diklik dan langkah berikutnya apa ("biar tau yang di klik atau gimana
+gimananya"). Bagian ini merangkum aturan kejelasan interaksi dari sumber
+otoritatif, lalu memetakan penerapannya ke identitas Arah A (kertas, tinta,
+garis aturan) — BUKAN kembali ke pill/biru/kartu lembut.
+
+### Aturan dari sumber
+
+1. **Signifier harus terbaca saat diam (at rest), bukan hanya saat hover.**
+   Pengguna tidak boleh dipaksa "menyapu layar dengan mouse" untuk mencari
+   yang bisa diklik; elemen interaktif harus membawa cukup isyarat —
+   batas/bentuk, warna, ukuran, penempatan, konsistensi — agar dikenali
+   sekilas. (Nielsen Norman Group, "Beyond Blue Links: Making Clickable
+   Elements Recognizable", 2015, diperbarui 2024 —
+   https://www.nngroup.com/articles/clickable-elements/)
+2. **Jangan membuat yang statis tampak interaktif, dan sebaliknya.**
+   Judul atau blok dekoratif yang digaya seperti tombol adalah affordance
+   palsu; sebaliknya tombol harus mempertahankan bentuk terbatas (bounded
+   shape) yang konsisten di seluruh halaman agar asosiasi "ini tombol"
+   terbentuk cepat. (NNGroup, artikel yang sama.)
+3. **Sistem keadaan lengkap dan konsisten.** Setiap komponen interaktif
+   memiliki keadaan enabled, hover, focus, pressed, disabled (dan selected
+   untuk toggle) yang masing-masing berbeda secara visual, tanpa membuat
+   komponennya terasa asing — keadaan adalah representasi visual status
+   komponen. (Material Design — interaction states; diringkas juga di
+   Figma Resource Library, "Understanding Button States in UI Design".)
+4. **Umpan balik seketika saat ditekan.** Efek klik harus "immediate and
+   obvious"; tombol menyala/berubah pada saat pointer-down, bukan menunggu
+   proses selesai — latensi pada jalur input terasa seperti antarmuka mati.
+   (Apple Human Interface Guidelines — Buttons; prinsip feedback/respons.)
+5. **Fokus keyboard selalu terlihat.** Navigasi Tab harus menunjukkan posisi
+   fokus dengan cincin/outline yang jelas; outline tidak boleh dihapus tanpa
+   pengganti yang setara, dan `:focus-visible` dipakai agar pengguna mouse
+   tidak terganggu. (Material Design — focus state; WCAG 2.4.7 Focus
+   Visible.)
+6. **Status sistem selalu terlihat saat bekerja.** Saat aksi berjalan,
+   label berubah ke bentuk kerja ("Examining…"), aksi yang sama tidak bisa
+   dipicu dua kali, dan pengguna tahu sistem sedang bekerja — bukan menebak.
+   (NNGroup, heuristik "Visibility of system status"; matriks keadaan UI:
+   keadaan loading wajib mencegah pengiriman ganda.)
+7. **Keadaan disabled harus menjelaskan dirinya.** Tombol mati tanpa
+   penjelasan membuat pengguna bertanya "kenapa?" — keadaan tidak-tersedia
+   wajib disertai syarat pengaktifnya atau langkah pengganti dalam kata-kata.
+   (Matriks keadaan UI — disabled: "is the enabling condition explained?";
+   sejalan dengan panduan NNGroup soal kontrol nonaktif.)
+8. **Disiplin kursor.** Kursor berubah hanya untuk memberi informasi fungsi:
+   pointer pada elemen interaktif, not-allowed pada yang disabled, progress
+   saat sibuk. (Apple HIG — kursor berubah bentuk hanya untuk memberi tahu
+   perubahan fungsi kursor.)
+9. **Gerak singkat dan bertujuan.** Transisi keadaan 100–200 ms cukup untuk
+   menegaskan perubahan tanpa terasa lambat; gerak yang lebih besar (mis.
+   cap yang ditekan) harus menghormati `prefers-reduced-motion`. (Panduan
+   gerak Apple HIG / Material — durasi pendek untuk feedback keadaan.)
+
+### Penerapan di ProofPay (Arah A)
+
+- **Aksi primer** = blok tinta padat (atau hijau uang untuk Release) dengan
+  label small-caps mono ber-letter-spacing + tanda arah "→" — terbaca
+  sebagai tombol saat diam (aturan 1, 2).
+- **Aksi sekunder** = blok berbingkai tinta transparan; hover membalik penuh
+  (tinta ↔ kertas), active bergeser 1px seperti ditekan (aturan 3, 4).
+- **Fokus** = outline ganda ala garis aturan: outline hijau 2px + offset
+  (aturan 5). **Disabled** = pola garis miring tipis (ruled hatch) + pudar +
+  `cursor: not-allowed`; **busy** = label kerja berelipsis animasi ("Exami-
+  ning…") + `cursor: progress` (aturan 6, 7, 8).
+- **Satu baris "Next — …" per milestone** sesuai keadaan + peran: menyatakan
+  langkah berikutnya dalam suara register, menempel pada tombolnya; bila
+  langkah itu milik peran lain, yang tampil adalah catatan tenang ("This
+  step belongs to the freelancer — switch roles above"), bukan tombol mati
+  (aturan 6, 7). Tahap berjalan pada garis tahap ditandai blok tinta di
+  belakang labelnya.
+- **Toggle peran** menyatakan akibatnya dalam satu baris yang berubah
+  ("You are acting as the client: you fund milestones and release
+  payment.").
+- **Input** terasa bisa disunting: garis bawah menebal + sapuan hijau sangat
+  tipis saat fokus; placeholder serif miring (aturan 1, 3).
+- **Lampiran (appendix)** memakai penanda eksplisit "+ Open … / − Close"
+  dalam mono; baris AG Grid mendapat sapuan hover sewarna kertas (aturan 1).
+- **Cap vonis** masuk dengan animasi "ditekan" singkat (skala/rotasi
+  mengendap 350 ms) saat pertama dirender; semua gerak 120–180 ms dan
+  dimatikan di bawah `prefers-reduced-motion` (aturan 9).

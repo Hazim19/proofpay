@@ -5,6 +5,7 @@
   import { moneyFig, sumEvents } from "./lib/format.ts";
   import ContractCard from "./components/ContractCard.svelte";
   import LedgerGrid from "./components/LedgerGrid.svelte";
+  import ActionButton from "./components/ActionButton.svelte";
 
   let role = $state<"client" | "freelancer">("client");
   let health = $state<Pick<Health, "paypalMode" | "paypalEnv" | "aiMode" | "aiModel"> | null>(null);
@@ -162,6 +163,7 @@
         <button
           id="roleClient"
           class:active={role === "client"}
+          aria-pressed={role === "client"}
           onclick={() => (role = "client")}
         >
           The Client
@@ -169,6 +171,7 @@
         <button
           id="roleFreelancer"
           class:active={role === "freelancer"}
+          aria-pressed={role === "freelancer"}
           onclick={() => (role = "freelancer")}
         >
           The Freelancer
@@ -182,6 +185,14 @@
       <a href="#sectionLedger">Ledger</a>
     </nav>
   </div>
+
+  <p class="role-note">
+    {#if role === "client"}
+      You are acting as <b>the client</b>: you fund milestones and release payment.
+    {:else}
+      You are acting as <b>the freelancer</b>: you submit deliverables against funded milestones.
+    {/if}
+  </p>
 
   {#if notice}
     <div class="notice" class:error={notice.error}>{notice.text}</div>
@@ -249,16 +260,16 @@
         </div>
         <p class="hint">Write a brief; the AI turns it into a contract with milestones and weighted criteria of acceptance.</p>
         <label for="brief">Job brief</label>
-        <textarea id="brief" rows="3" bind:value={brief}></textarea>
+        <textarea id="brief" rows="3" bind:value={brief} placeholder="Describe the job — what is to be delivered, and how success will be judged…"></textarea>
         <label for="clientEmail">Client email</label>
-        <input id="clientEmail" bind:value={clientEmail} />
+        <input id="clientEmail" bind:value={clientEmail} placeholder="client@example.com" />
         <label for="freelancerEmail">Freelancer email</label>
-        <input id="freelancerEmail" bind:value={freelancerEmail} />
+        <input id="freelancerEmail" bind:value={freelancerEmail} placeholder="freelancer@example.com" />
         <label for="totalAmount">Total amount (USD)</label>
-        <input id="totalAmount" type="number" min="1" bind:value={totalAmount} />
-        <button class="action" disabled={busyKey !== null} onclick={createContract}>
-          {busyKey === "create" ? "Working…" : "Draw up the contract"}
-        </button>
+        <input id="totalAmount" type="number" min="1" bind:value={totalAmount} placeholder="500" />
+        <ActionButton anyBusy={busyKey !== null} working={busyKey === "create"} workingLabel="Drawing up" onclick={createContract}>
+          Draw up the contract
+        </ActionButton>
       </section>
     {:else}
       <section id="freelancerPanel">
@@ -268,7 +279,7 @@
         </div>
         <p class="hint">Pick a funded milestone below, then paste the delivery here and submit it from the milestone row.</p>
         <label for="deliverable">Deliverable content (text or link)</label>
-        <textarea id="deliverable" rows="4" bind:value={deliverable}></textarea>
+        <textarea id="deliverable" rows="4" bind:value={deliverable} placeholder="Paste the delivered work — text or a link — exactly as it should be examined…"></textarea>
       </section>
     {/if}
   </div>
@@ -306,7 +317,7 @@
   </section>
 
   <details class="appendix">
-    <summary>Appendix — last API response (JSON), kept for the developer</summary>
+    <summary>Open the folio appendix — last API response (JSON), kept for the developer</summary>
     <pre>{lastJson}</pre>
   </details>
 
