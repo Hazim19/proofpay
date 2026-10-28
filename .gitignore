@@ -6,3 +6,6 @@ data/
 deploy/proofpay.env
 *.log
 dist/
+video/
+VIDEO_SCRIPT.md
+hidden-connect-link.txt

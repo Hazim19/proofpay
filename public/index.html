@@ -7,43 +7,140 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/styles/ag-grid.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/styles/ag-theme-quartz.css" />
 <style>
-  body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7f9; color: #14213d; }
-  header { background: #003087; color: #fff; padding: 16px 24px; }
-  header h1 { margin: 0; font-size: 22px; }
-  header p { margin: 4px 0 0; opacity: .85; font-size: 13px; }
-  main { max-width: 1100px; margin: 0 auto; padding: 20px; }
-  .roles { display: flex; gap: 8px; margin-bottom: 16px; }
-  .roles button { padding: 8px 16px; border-radius: 999px; border: 1px solid #003087; background: #fff; cursor: pointer; }
-  .roles button.active { background: #003087; color: #fff; }
-  section { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  label { display: block; font-size: 13px; margin: 8px 0 4px; }
-  input, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
-  button.action { background: #0070e0; color: #fff; border: 0; padding: 8px 14px; border-radius: 6px; cursor: pointer; margin: 4px 4px 0 0; }
+  :root {
+    --navy: #001c64; --blue: #003087; --sky: #0070e0; --ink: #101828; --muted: #5b6b82;
+    --line: #e3e9f2; --bg: #eef2f7; --card: #ffffff;
+    --green: #067647; --green-bg: #e6f4ea; --amber: #b54708; --amber-bg: #fef3e2;
+    --red: #b42318; --red-bg: #fdecea; --violet: #6941c6; --violet-bg: #f0ebfd;
+    --grey-bg: #eef1f5; --gold: #c9a24b;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; margin: 0; background: var(--bg); color: var(--ink); }
+  header.site {
+    background: linear-gradient(120deg, var(--navy) 0%, var(--blue) 55%, #0057b8 100%);
+    color: #fff; padding: 26px 24px 22px;
+  }
+  .header-in { max-width: 1120px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; justify-content: space-between; }
+  .brand { display: flex; gap: 14px; align-items: center; }
+  .logo { width: 48px; height: 48px; border-radius: 13px; background: #fff; color: var(--blue);
+    display: flex; align-items: center; justify-content: center; font-size: 27px; font-weight: 800; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  .brand h1 { margin: 0; font-size: 27px; letter-spacing: .2px; }
+  .brand .tag { margin: 3px 0 0; font-size: 14px; opacity: .92; max-width: 560px; line-height: 1.45; }
+  .pills { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,.13);
+    border: 1px solid rgba(255,255,255,.35); padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #98a2b3; display: inline-block; }
+  .dot.on { background: #32d583; box-shadow: 0 0 0 3px rgba(50,213,131,.3); }
+  .steps { max-width: 1120px; margin: 18px auto 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .step { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); border-radius: 12px; padding: 12px 14px; color: #fff; }
+  .step b { display: block; font-size: 14px; margin-bottom: 3px; }
+  .step span { font-size: 12.5px; opacity: .88; line-height: 1.4; display: block; }
+  .step .n { display: inline-flex; width: 21px; height: 21px; border-radius: 50%; background: var(--gold); color: #231a04;
+    align-items: center; justify-content: center; font-size: 12px; font-weight: 800; margin-right: 7px; vertical-align: -6px; }
+  main { max-width: 1120px; margin: 0 auto; padding: 22px 20px 10px; }
+  .roles { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  .seg { display: inline-flex; background: #dbe4f0; border-radius: 999px; padding: 4px; }
+  .seg button { padding: 8px 18px; border-radius: 999px; border: 0; background: transparent; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--blue); }
+  .seg button.active { background: var(--blue); color: #fff; box-shadow: 0 2px 6px rgba(0,48,135,.35); }
+  section.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 2px 8px rgba(16,24,40,.05); }
+  section.card h2 { margin: 0 0 6px; font-size: 18px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 4px; color: #243b5e; }
+  input, textarea { width: 100%; padding: 9px 11px; border: 1px solid #c4cfe0; border-radius: 8px; font: inherit; font-size: 14px; background: #fbfcfe; }
+  input:focus, textarea:focus { outline: 2px solid var(--sky); border-color: var(--sky); background: #fff; }
+  button.action { background: var(--sky); color: #fff; border: 0; padding: 9px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; margin: 6px 6px 0 0; }
+  button.action:hover { background: #005fc4; }
   button.action:disabled { background: #9db8d2; cursor: default; }
-  .milestone { border-top: 1px solid #eee; padding: 10px 0; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #e8eefc; font-size: 12px; }
-  #ledgerGrid { height: 320px; width: 100%; }
-  .hint { font-size: 12px; color: #666; }
-  .notice { border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; background: #e6f4ea; border: 1px solid #2e7d32; color: #1b4332; }
-  .notice.error { background: #fdecea; border-color: #c62828; color: #7f1d1d; }
+  button.action.gold { background: var(--gold); color: #231a04; }
+  .hint { font-size: 12.5px; color: var(--muted); }
+  .notice { border-radius: 12px; padding: 13px 16px; margin-bottom: 16px; font-size: 14.5px; background: var(--green-bg); border: 1px solid var(--green); color: #14532d; }
+  .notice.error { background: var(--red-bg); border-color: var(--red); color: #7a271a; }
+  /* contract cards */
+  .contract { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin-bottom: 16px; background: #fcfdff; }
+  .contract-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 6px; }
+  .contract-head .title { font-size: 17px; font-weight: 700; }
+  .meta { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; background: var(--grey-bg); border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+  .total { font-size: 15px; font-weight: 700; color: var(--blue); white-space: nowrap; }
+  .milestone { padding: 14px 2px 6px; border-top: 1px dashed var(--line); }
+  .milestone:first-of-type { border-top: 0; }
+  .ms-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ms-head .ms-title { font-weight: 700; font-size: 15.5px; }
+  .ms-amount { font-weight: 800; color: var(--ink); }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--grey-bg); color: #344054; }
+  .badge.funded { background: #e0ecff; color: var(--blue); }
+  .badge.awaiting_approval { background: var(--amber-bg); color: var(--amber); }
+  .badge.submitted { background: var(--violet-bg); color: var(--violet); }
+  .badge.released { background: var(--green-bg); color: var(--green); }
+  .badge.failed { background: var(--red-bg); color: var(--red); }
+  .ids { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .ids .k { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+  .criteria { list-style: none; margin: 12px 0 4px; padding: 0; display: grid; gap: 8px; }
+  .criteria li { display: flex; gap: 10px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+  .criteria .w { flex: 0 0 auto; font-weight: 800; font-size: 12.5px; color: var(--blue); background: #e0ecff; border-radius: 7px; padding: 3px 8px; height: fit-content; }
+  .criteria .lbl { font-size: 14px; line-height: 1.45; }
+  .verdict { flex: 0 0 auto; height: fit-content; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; }
+  .verdict.pass { background: var(--green-bg); color: var(--green); }
+  .verdict.partial { background: var(--amber-bg); color: var(--amber); }
+  .verdict.fail { background: var(--red-bg); color: var(--red); }
+  .reason { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-top: 3px; }
+  .verify-box { margin-top: 12px; background: #f4f8ff; border: 1px solid #cfdefc; border-radius: 12px; padding: 12px 14px; }
+  .verify-box .v-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+  .bar { height: 12px; background: #dbe4f0; border-radius: 999px; overflow: hidden; margin-top: 9px; }
+  .bar > div { height: 100%; background: linear-gradient(90deg, var(--sky), var(--green)); border-radius: 999px; }
+  .bar-label { font-size: 12.5px; color: var(--muted); margin-top: 5px; }
+  .deliverable { margin-top: 12px; background: #fffdf5; border: 1px solid #eadfc0; border-radius: 12px; padding: 12px 14px; }
+  .deliverable .d-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: #8a6d1f; margin-bottom: 6px; }
+  .deliverable .d-body { font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  #ledgerGrid { height: 340px; width: 100%; }
+  .ev { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: var(--grey-bg); color: #344054; }
+  .ev.money { background: var(--green-bg); color: var(--green); }
+  .ev.ai { background: var(--violet-bg); color: var(--violet); }
+  .ev.fund { background: #e0ecff; color: var(--blue); }
+  details.debug { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin-bottom: 18px; }
+  details.debug summary { cursor: pointer; font-weight: 600; font-size: 13.5px; color: var(--muted); }
   pre { background: #0d1526; color: #cfe3ff; padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 12px; }
+  footer { max-width: 1120px; margin: 0 auto; padding: 4px 20px 26px; font-size: 12.5px; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } .pills { align-items: flex-start; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>ProofPay</h1>
-  <p>Milestone escrow for freelance work — funds are released only after AI verifies the delivery. Live demo on the PayPal sandbox with AI-drafted contracts and AI verification (Gemini); the status line below always shows which mode is active.</p>
+<header class="site">
+  <div class="header-in">
+    <div class="brand">
+      <div class="logo">✓</div>
+      <div>
+        <h1>ProofPay</h1>
+        <p class="tag">Escrow that pays on evidence, not trust. The client funds a milestone through
+        PayPal, the freelancer delivers, and AI verifies the work against the contract criteria
+        before any money is released.</p>
+      </div>
+    </div>
+    <div class="pills">
+      <span class="pill"><span class="dot" id="dotPaypal"></span><span id="pillPaypal">PayPal: …</span></span>
+      <span class="pill"><span class="dot" id="dotAi"></span><span id="pillAi">AI: …</span></span>
+      <span class="sr-only" id="modeInfo"></span>
+    </div>
+  </div>
+  <div class="steps">
+    <div class="step"><b><span class="n">1</span>Describe &amp; draft</b><span>The client describes the job; AI drafts milestones with measurable, weighted acceptance criteria.</span></div>
+    <div class="step"><b><span class="n">2</span>Fund via PayPal</b><span>The client approves in PayPal Checkout. The money is authorised and held — not sent.</span></div>
+    <div class="step"><b><span class="n">3</span>Verify &amp; release</b><span>AI checks the delivery criterion by criterion with cited evidence. Payment follows the verdict: earned share out, the rest refunded.</span></div>
+  </div>
 </header>
 <main>
   <div id="notice" class="notice" style="display:none"></div>
   <div class="roles">
-    <button id="roleClient" class="active" onclick="setRole('client')">I am the Client</button>
-    <button id="roleFreelancer" onclick="setRole('freelancer')">I am the Freelancer</button>
-    <span class="hint" id="modeInfo"></span>
+    <div class="seg">
+      <button id="roleClient" class="active" onclick="setRole('client')">I am the Client</button>
+      <button id="roleFreelancer" onclick="setRole('freelancer')">I am the Freelancer</button>
+    </div>
+    <span class="hint">Switch roles to act as each side of the same escrow.</span>
   </div>
 
-  <section id="clientPanel">
+  <section class="card" id="clientPanel">
     <h2>New contract (client)</h2>
+    <p class="hint">Write a brief; the AI turns it into a contract with milestones and weighted criteria.</p>
     <label>Job brief</label>
     <textarea id="brief" rows="3">Design a landing page for a coffee brand, including hero section, product grid and contact form. Deliver complete final files in web format with a short summary of how to use them.</textarea>
     <label>Client email</label>
@@ -55,33 +152,47 @@
     <button class="action" onclick="createContract()">Create contract from brief</button>
   </section>
 
-  <section id="freelancerPanel" style="display:none">
+  <section class="card" id="freelancerPanel" style="display:none">
     <h2>Submit a deliverable (freelancer)</h2>
     <p class="hint">Pick a funded milestone below, then paste the delivery here and submit it from the milestone row.</p>
     <label>Deliverable content (text or link)</label>
     <textarea id="deliverable" rows="4">Final landing page files in complete web format. The design covers the coffee brand brief: hero section, product grid, contact form. Summary and notes on how to use the files are included.</textarea>
   </section>
 
-  <section>
+  <section class="card">
     <h2>Contracts &amp; milestones</h2>
+    <p class="hint">Every contract below is real data from this live demo. Verification verdicts cite the evidence the AI relied on.</p>
     <div id="contracts"></div>
   </section>
 
-  <section>
+  <section class="card">
     <h2>Ledger — evidence trail</h2>
+    <p class="hint">Every step, with its PayPal transaction ID. If a dispute ever happens, this trail already exists.</p>
     <div id="ledgerGrid" class="ag-theme-quartz"></div>
   </section>
 
-  <section>
-    <h2>Last API response</h2>
+  <details class="debug">
+    <summary>Developer detail — last API response (JSON)</summary>
     <pre id="out">{}</pre>
-  </section>
+  </details>
 </main>
+<footer>
+  <span>ProofPay — built for the PayPal AI Hackathon.</span>
+  <span>Demo runs on the PayPal sandbox: all money shown is test money.</span>
+</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js"></script>
 <script>
 let role = 'client';
 let gridApi = null;
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+function money(amount, currency) {
+  const n = Number(amount);
+  return (currency || 'USD') + ' ' + (Number.isFinite(n) ? n.toFixed(2) : esc(amount));
+}
 
 function setRole(r) {
   role = r;
@@ -108,6 +219,12 @@ async function refresh() {
   window._paypalMode = health.paypalMode;
   document.getElementById('modeInfo').textContent =
     'PayPal: ' + health.paypalMode + ' (' + health.paypalEnv + ')';
+  document.getElementById('pillPaypal').textContent =
+    'PayPal: ' + health.paypalMode + ' (' + health.paypalEnv + ')';
+  document.getElementById('pillAi').textContent =
+    'AI: ' + health.aiMode + (health.aiModel ? ' · ' + health.aiModel : '');
+  document.getElementById('dotPaypal').classList.toggle('on', health.paypalMode === 'live');
+  document.getElementById('dotAi').classList.toggle('on', health.aiMode === 'live');
   const data = await api('/api/contracts');
   window._contracts = data.contracts || [];
   renderContracts(window._contracts);
@@ -115,27 +232,85 @@ async function refresh() {
   if (gridApi) gridApi.setGridOption('rowData', (events.events || []).slice().reverse());
 }
 
+const STATUS_LABELS = { awaiting_approval: 'Awaiting client approval' };
+function statusLabel(status) { return STATUS_LABELS[status] || status; }
+
+function verdictChip(vc) {
+  if (!vc) return '';
+  return `<span class="verdict ${esc(vc.status)}">${esc(vc.status)}</span>`;
+}
+
 function renderContracts(contracts) {
   const el = document.getElementById('contracts');
   if (!contracts.length) { el.innerHTML = '<p class="hint">No contracts yet.</p>'; return; }
-  el.innerHTML = contracts.map(c => `
-    <div>
-      <strong>${c.title}</strong><br/>
-      <span class="hint">${c.id} · client ${c.clientEmail} · freelancer ${c.freelancerEmail}</span>
-      ${c.milestones.map(m => `
-        <div class="milestone">
-          <strong>${m.title}</strong> — ${m.amount} ${m.currency}
-          <span class="badge">${statusLabel(m.status)}</span>
-          ${m.verification ? `<span class="badge">verified: ${m.verification.overall} · release ${(m.verification.releaseFraction*100).toFixed(0)}%</span>` : ''}
+  el.innerHTML = contracts.map(c => {
+    const total = c.milestones.reduce((s, m) => s + (Number(m.amount) || 0), 0);
+    const cur = c.currency || (c.milestones[0] && c.milestones[0].currency) || 'USD';
+    return `
+    <div class="contract" id="contract-${esc(c.id)}">
+      <div class="contract-head">
+        <div>
+          <span class="title">${esc(c.title)}</span>
+          <div class="meta"><span class="mono">${esc(c.id)}</span> · client ${esc(c.clientEmail)} · freelancer ${esc(c.freelancerEmail)}</div>
+        </div>
+        <span class="total">${money(total, cur)} total</span>
+      </div>
+      ${c.milestones.map(m => {
+        const vById = {};
+        if (m.verification) (m.verification.criteria || []).forEach(vc => { vById[vc.criterionId] = vc; });
+        const pct = m.verification ? Math.round(m.verification.releaseFraction * 100) : 0;
+        const ids = [
+          ['Order', m.paypalOrderId], ['Authorisation', m.paypalAuthorizationId],
+          ['Capture', m.paypalCaptureId], ['Refund', m.paypalRefundId], ['Payout batch', m.paypalPayoutBatchId],
+        ].filter(([, v]) => v);
+        return `
+        <div class="milestone" id="milestone-${esc(m.id)}">
+          <div class="ms-head">
+            <span class="ms-title">${esc(m.title)}</span>
+            <span class="ms-amount">${money(m.amount, m.currency)}</span>
+            <span class="badge ${esc(m.status)}">${esc(statusLabel(m.status))}</span>
+            ${m.verification ? `<span class="badge released">verified: ${esc(m.verification.overall)} · release ${pct}%</span>` : ''}
+          </div>
+          ${ids.length ? `<div class="ids"><span class="k">PayPal</span>${ids.map(([k, v]) => `<span class="mono">${esc(k)} ${esc(v)}</span>`).join(' ')}</div>` : ''}
+          <ul class="criteria">
+            ${m.criteria.map(cr => {
+              const vc = vById[cr.id];
+              return `<li>
+                <span class="w">${Math.round(cr.weight * 100)}%</span>
+                <div>
+                  <span class="lbl">${esc(cr.label)}</span>
+                  ${vc ? `<div class="reason">${esc(vc.reason)}</div>` : ''}
+                </div>
+                ${verdictChip(vc)}
+              </li>`;
+            }).join('')}
+          </ul>
+          ${m.deliverable ? `
+          <div class="deliverable">
+            <div class="d-title">Deliverable submitted</div>
+            <div class="d-body">${esc(m.deliverable.content)}</div>
+          </div>` : ''}
+          ${m.verification ? `
+          <div class="verify-box">
+            <div class="v-head">
+              <strong>AI verification: ${esc(m.verification.overall)}</strong>
+              <span class="badge">verifier: ${esc(m.verification.verifier)}</span>
+              <span class="hint">checked ${esc(String(m.verification.checkedAt || '').slice(0, 10))}</span>
+            </div>
+            <div class="bar"><div style="width:${pct}%"></div></div>
+            <div class="bar-label">Release fraction ${pct}% of ${money(m.amount, m.currency)} = ${money(m.verification.releaseFraction * Number(m.amount), m.currency)} to the freelancer; the remainder is refunded to the client.</div>
+          </div>` : ''}
           <div>
             ${role === 'client' && m.status === 'draft' ? `<button class="action" onclick="fundMilestone('${c.id}','${m.id}')">Fund (authorize via PayPal)</button>` : ''}
             ${role === 'client' && m.status === 'awaiting_approval' ? `<button class="action" onclick="act('${c.id}','${m.id}','confirm-fund')">Confirm funding (after PayPal approval)</button>` : ''}
             ${role === 'freelancer' && (m.status === 'funded' || m.status === 'failed') ? `<button class="action" onclick="submitWork('${c.id}','${m.id}')">Submit deliverable</button>` : ''}
             ${m.status === 'submitted' ? `<button class="action" onclick="act('${c.id}','${m.id}','verify')">Verify with AI</button>` : ''}
-            ${role === 'client' && m.verification && m.status !== 'released' ? `<button class="action" onclick="act('${c.id}','${m.id}','release')">Release per verification</button>` : ''}
+            ${role === 'client' && m.verification && m.status !== 'released' ? `<button class="action gold" onclick="act('${c.id}','${m.id}','release')">Release per verification</button>` : ''}
           </div>
-        </div>`).join('')}
-    </div>`).join('<hr/>');
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
 }
 
 async function createContract() {
@@ -162,9 +337,6 @@ async function act(contractId, milestoneId, action) {
   refresh();
 }
 
-const STATUS_LABELS = { awaiting_approval: 'Awaiting client approval' };
-function statusLabel(status) { return STATUS_LABELS[status] || status; }
-
 function showNotice(text, isError) {
   const el = document.getElementById('notice');
   el.textContent = text;
@@ -188,6 +360,25 @@ async function fundMilestone(contractId, milestoneId) {
   refresh();
 }
 
+function detailText(d) {
+  if (!d || typeof d !== 'object') return '';
+  const parts = [];
+  if (d.amount !== undefined) parts.push(money(d.amount, d.currency));
+  if (d.title) parts.push(String(d.title));
+  if (d.generator) parts.push('drafted by ' + d.generator);
+  if (d.orderId) parts.push('order ' + d.orderId);
+  if (d.authorizationId) parts.push('authorisation ' + d.authorizationId);
+  if (d.captureId) parts.push('capture ' + d.captureId);
+  if (d.refundId) parts.push('refund ' + d.refundId + (d.to ? ' to ' + d.to : ''));
+  if (d.payoutBatchId) parts.push('payout batch ' + d.payoutBatchId + (d.to ? ' to ' + d.to : ''));
+  if (d.verifier) parts.push('verifier ' + d.verifier + (d.overall ? ' · ' + d.overall : '') + (d.releaseFraction !== undefined ? ' · release ' + Math.round(d.releaseFraction * 100) + '%' : ''));
+  if (d.kind) parts.push('deliverable: ' + d.kind + (d.length ? ', ' + d.length + ' chars' : ''));
+  if (d.paypalMode) parts.push('PayPal ' + d.paypalMode);
+  return parts.join(' · ');
+}
+
+const EV_CLASS = { captured: 'money', refunded: 'money', payout_sent: 'money', verified: 'ai', contract_created: 'ai', order_created: 'fund', funding_authorized: 'fund' };
+
 document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   if (params.get('funded')) {
@@ -199,11 +390,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   gridApi = agGrid.createGrid(document.getElementById('ledgerGrid'), {
     columnDefs: [
-      { field: 'ts', headerName: 'Time', width: 190 },
-      { field: 'type', headerName: 'Event', width: 180 },
-      { field: 'contractId', headerName: 'Contract', width: 130 },
-      { field: 'milestoneId', headerName: 'Milestone', width: 150 },
-      { field: 'detail', headerName: 'Detail', flex: 1, valueFormatter: p => JSON.stringify(p.value || {}) },
+      { field: 'ts', headerName: 'Time', width: 185, valueFormatter: p => p.value ? String(p.value).replace('T', ' ').slice(0, 19) : '' },
+      { field: 'type', headerName: 'Event', width: 175, cellRenderer: p => `<span class="ev ${EV_CLASS[p.value] || ''}">${esc(p.value)}</span>` },
+      { field: 'contractId', headerName: 'Contract', width: 135 },
+      { field: 'milestoneId', headerName: 'Milestone', width: 155 },
+      { field: 'detail', headerName: 'Detail', flex: 1, valueFormatter: p => detailText(p.value) },
     ],
     rowData: [],
   });
