@@ -51,7 +51,9 @@ export class AiError extends Error {
   }
 }
 
-const REQUEST_TIMEOUT_MS = 60_000;
+// 180s: the live Gemini model has been observed taking ~50s for a trivial
+// prompt during provider slowdowns, so 60s was too tight for real verdicts.
+const REQUEST_TIMEOUT_MS = 180_000;
 
 interface ChatCompletionResponse {
   choices?: { message?: { content?: unknown } }[];
