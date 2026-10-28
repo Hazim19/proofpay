@@ -3,9 +3,8 @@
 The demo UI is a plain Vite + Svelte 5 app (no SvelteKit — the Fastify
 backend in `../src` stays the only server).
 
-Design: **Direction A — "financial paperwork, elevated"**, per the approved
-mockups in `../referensi-ui/mockups/arah-A-home.html` and
-`arah-A-kontrak.html`. Warm paper, ink, Fraunces display serif, Newsreader
+Design: **Direction A — "financial paperwork, elevated"**. Warm paper,
+ink, Fraunces display serif, Newsreader
 body, IBM Plex Mono for money and IDs; contracts are printed instruments,
 criteria form an examination table, and the AI verdict is a rubber stamp
 beside a settlement ledger. The earlier Three.js hero scene was retired

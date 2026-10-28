@@ -164,20 +164,6 @@ token is then required as an `x-setup-token` header or `?setup_token=`
 query value. Without it the page is open (local-demo default) and the
 server logs a startup warning saying so.
 
-## Deployment (systemd, optional)
-
-`deploy/` carries a ready unit and restore script in the pattern of the
-owner's other VM services:
-
-```bash
-bash deploy/restore-proofpay.sh   # installs + starts the proofpay service
-```
-
-It installs `deploy/proofpay.service` (substituting the repo path), creates
-`deploy/proofpay.env` on first run (PORT 3102, mode `0600`, never
-overwritten afterwards), and restarts the service. It does not touch DNS,
-tunnels, or any other service.
-
 ## AI layer
 
 The contract drafter and the deliverable verifier call any

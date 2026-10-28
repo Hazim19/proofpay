@@ -19,3 +19,7 @@ hidden-connect-link.txt
 referensi-ui/*.png
 referensi-ui/*.webp
 frontend/BUILD_DONE
+AUDIT_*.md
+CATATAN_*.md
+referensi-ui/
+deploy/
