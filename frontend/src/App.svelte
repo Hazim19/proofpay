@@ -2,8 +2,7 @@
   import { onMount } from "svelte";
   import type { Contract, Health, LedgerEvent } from "./lib/types.ts";
   import { api, fetchHealth, setJsonSink } from "./lib/api.ts";
-  import { money, sumEvents } from "./lib/format.ts";
-  import HeroScene from "./components/HeroScene.svelte";
+  import { moneyFig, sumEvents } from "./lib/format.ts";
   import ContractCard from "./components/ContractCard.svelte";
   import LedgerGrid from "./components/LedgerGrid.svelte";
 
@@ -30,11 +29,12 @@
     lastJson = JSON.stringify(json, null, 2);
   });
 
-  const statFunded = $derived(
-    money(sumEvents(events, ["funding_authorized", "milestone_funded"]), "USD"),
+  const fundedFig = $derived(
+    moneyFig(sumEvents(events, ["funding_authorized", "milestone_funded"]), "USD"),
   );
-  const statPaidOut = $derived(money(sumEvents(events, ["payout_sent"]), "USD"));
-  const statRefunded = $derived(money(sumEvents(events, ["refunded"]), "USD"));
+  const paidFig = $derived(moneyFig(sumEvents(events, ["payout_sent"]), "USD"));
+  const refundedFig = $derived(moneyFig(sumEvents(events, ["refunded"]), "USD"));
+  const issueNo = $derived(String(Math.max(contracts.length, 0)).padStart(2, "0"));
 
   async function refresh() {
     try {
@@ -132,167 +132,186 @@
   });
 </script>
 
-<div class="shell">
-  <aside class="side">
-    <div class="side-brand">
-      <div class="logo">✓</div>
-      <div>
-        <div class="name">ProofPay</div>
-        <div class="sub">AI-verified milestone escrow</div>
+<div class="page" id="top">
+  <div class="mast-top">
+    <div class="sc">Escrow &amp; Settlement Register</div>
+    <div class="sc mast-mid">Funds held by PayPal · Released on evidence</div>
+    <div class="sc">Vol. I — No. {issueNo}</div>
+  </div>
+
+  <div class="masthead">
+    <h1>Proof<span class="pay">Pay</span></h1>
+    <p class="tagline">
+      Escrow that pays on <b>evidence</b>, not trust. The client funds a milestone;
+      the freelancer delivers; the work is examined, criterion by criterion,
+      before a single dollar moves.
+    </p>
+  </div>
+
+  <div class="status-line">
+    Rail — <b>PayPal {health ? `${health.paypalMode} (${health.paypalEnv})` : "…"}</b>
+    · Verifier — <b>AI {health ? health.aiMode + (health.aiModel ? " · " + health.aiModel : "") : "…"}</b>
+    · All sums are sandbox test money
+  </div>
+  <div class="rule-double"></div>
+
+  <div class="acting-row">
+    <div class="acting">
+      <span class="sc">Acting as</span>
+      <div class="switch" role="group" aria-label="Choose your role">
+        <button
+          id="roleClient"
+          class:active={role === "client"}
+          onclick={() => (role = "client")}
+        >
+          The Client
+        </button>
+        <button
+          id="roleFreelancer"
+          class:active={role === "freelancer"}
+          onclick={() => (role = "freelancer")}
+        >
+          The Freelancer
+        </button>
       </div>
     </div>
-    <nav>
-      <div class="nav-k">Workspace</div>
-      <a href="#top" class="active"><span class="ic">▦</span>Overview</a>
-      <a href="#clientPanel"><span class="ic">＋</span>New contract</a>
-      <a href="#sectionContracts"><span class="ic">▤</span>Contracts</a>
-      <a href="#sectionLedger"><span class="ic">≣</span>Ledger</a>
-      <div class="nav-k">Learn</div>
-      <a href="#sectionHow"><span class="ic">?</span>How it works</a>
+    <nav class="regnav">
+      <a href="#sectionHow">How it proceeds</a>
+      <a href="#entryForm">New instrument</a>
+      <a href="#sectionContracts">Contracts</a>
+      <a href="#sectionLedger">Ledger</a>
     </nav>
-    <div class="side-foot">
-      <span class="pill">
-        <span class="dot" class:on={health?.paypalMode === "live"}></span>
-        PayPal: {health ? `${health.paypalMode} (${health.paypalEnv})` : "…"}
-      </span>
-      <span class="pill">
-        <span class="dot" class:on={health?.aiMode === "live"}></span>
-        AI: {health ? health.aiMode + (health.aiModel ? " · " + health.aiModel : "") : "…"}
-      </span>
-      <p class="side-note">Demo runs on the PayPal sandbox — all money shown is test money.</p>
+  </div>
+
+  {#if notice}
+    <div class="notice" class:error={notice.error}>{notice.text}</div>
+  {/if}
+  {#if loadError}
+    <div class="notice error">Could not load demo data: {loadError}</div>
+  {/if}
+
+  <div class="ledger-kpi">
+    <div>
+      <div class="lab">Contracts on the books</div>
+      <div class="fig">{contracts.length}</div>
+      <div class="note">live escrow instruments</div>
     </div>
-  </aside>
-
-  <div class="main-wrap" id="top">
-    <div class="main-in">
-      <header class="hero">
-        <HeroScene />
-        <div class="hero-in">
-          <div class="hero-text">
-            <div class="hero-eyebrow">AI-verified milestone escrow</div>
-            <h1>Escrow that pays on evidence, not trust.</h1>
-            <p>
-              The client funds a milestone through PayPal, the freelancer delivers,
-              and AI verifies the work against the contract criteria before any
-              money is released.
-            </p>
-          </div>
-          <div class="seg" role="group" aria-label="Choose your role">
-            <button class:active={role === "client"} onclick={() => (role = "client")}>
-              I am the Client
-            </button>
-            <button class:active={role === "freelancer"} onclick={() => (role = "freelancer")}>
-              I am the Freelancer
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {#if notice}
-        <div class="notice" class:error={notice.error}>{notice.text}</div>
-      {/if}
-      {#if loadError}
-        <div class="notice error">Could not load demo data: {loadError}</div>
-      {/if}
-
-      <div class="stats">
-        <div class="stat">
-          <div class="k">Contracts</div>
-          <div class="v">{contracts.length}</div>
-          <div class="s">live escrow contracts</div>
-        </div>
-        <div class="stat">
-          <div class="k">Escrow funded</div>
-          <div class="v">{statFunded}</div>
-          <div class="s">authorised &amp; held via PayPal</div>
-        </div>
-        <div class="stat">
-          <div class="k">Paid to freelancers</div>
-          <div class="v">{statPaidOut}</div>
-          <div class="s">released after AI verification</div>
-        </div>
-        <div class="stat">
-          <div class="k">Refunded to clients</div>
-          <div class="v">{statRefunded}</div>
-          <div class="s">unearned share returned</div>
-        </div>
-      </div>
-
-      <div class="how" id="sectionHow">
-        <div class="h-card">
-          <span class="n">1</span><b>Describe &amp; draft</b>
-          <span>The client describes the job; AI drafts milestones with measurable, weighted acceptance criteria.</span>
-        </div>
-        <div class="h-card">
-          <span class="n">2</span><b>Fund via PayPal</b>
-          <span>The client approves in PayPal Checkout. The money is authorised and held — not sent.</span>
-        </div>
-        <div class="h-card">
-          <span class="n">3</span><b>Verify &amp; release</b>
-          <span>AI checks the delivery criterion by criterion with cited evidence. Payment follows the verdict: earned share out, the rest refunded.</span>
-        </div>
-      </div>
-
-      {#if role === "client"}
-        <section class="card" id="clientPanel">
-          <h2>New contract (client)</h2>
-          <p class="hint">Write a brief; the AI turns it into a contract with milestones and weighted criteria.</p>
-          <label for="brief">Job brief</label>
-          <textarea id="brief" rows="3" bind:value={brief}></textarea>
-          <label for="clientEmail">Client email</label>
-          <input id="clientEmail" bind:value={clientEmail} />
-          <label for="freelancerEmail">Freelancer email</label>
-          <input id="freelancerEmail" bind:value={freelancerEmail} />
-          <label for="totalAmount">Total amount (USD)</label>
-          <input id="totalAmount" type="number" min="1" bind:value={totalAmount} />
-          <button class="action" disabled={busyKey !== null} onclick={createContract}>
-            {busyKey === "create" ? "Working…" : "Create contract from brief"}
-          </button>
-        </section>
-      {:else}
-        <section class="card" id="freelancerPanel">
-          <h2>Submit a deliverable (freelancer)</h2>
-          <p class="hint">Pick a funded milestone below, then paste the delivery here and submit it from the milestone row.</p>
-          <label for="deliverable">Deliverable content (text or link)</label>
-          <textarea id="deliverable" rows="4" bind:value={deliverable}></textarea>
-        </section>
-      {/if}
-
-      <section class="card" id="sectionContracts">
-        <h2>Contracts &amp; milestones</h2>
-        <p class="hint">Every contract below is real data from this live demo. Verification verdicts cite the evidence the AI relied on.</p>
-        <div id="contracts">
-          {#if !contracts.length}
-            <p class="hint">No contracts yet.</p>
-          {/if}
-          {#each contracts as contract (contract.id)}
-            <ContractCard
-              {contract}
-              {role}
-              {busyKey}
-              onAction={act}
-              onFund={fundMilestone}
-              onSubmit={submitWork}
-            />
-          {/each}
-        </div>
-      </section>
-
-      <section class="card" id="sectionLedger">
-        <h2>Ledger — evidence trail</h2>
-        <p class="hint">Every step, with its PayPal transaction ID. If a dispute ever happens, this trail already exists.</p>
-        <LedgerGrid {events} />
-      </section>
-
-      <details class="debug">
-        <summary>Developer detail — last API response (JSON)</summary>
-        <pre>{lastJson}</pre>
-      </details>
-
-      <footer>
-        <span>ProofPay — built for the PayPal AI Hackathon.</span>
-        <span>Funds held by PayPal · Both sides see the same evidence · Release follows the AI verdict</span>
-      </footer>
+    <div>
+      <div class="lab">Authorised &amp; held</div>
+      <div class="fig"><small>{fundedFig.cur}</small> {fundedFig.num}</div>
+      <div class="note">funded through PayPal</div>
     </div>
+    <div>
+      <div class="lab">Paid to freelancers</div>
+      <div class="fig"><small>{paidFig.cur}</small> {paidFig.num}</div>
+      <div class="note">released after examination</div>
+    </div>
+    <div>
+      <div class="lab">Returned to clients</div>
+      <div class="fig"><small>{refundedFig.cur}</small> {refundedFig.num}</div>
+      <div class="note">the unearned share, refunded</div>
+    </div>
+  </div>
+
+  <div class="steps" id="sectionHow">
+    <div>
+      <div class="rn">№ 1</div>
+      <h3>The brief becomes an instrument</h3>
+      <p>
+        The client describes the job. The contract is drawn up with milestones and
+        weighted, measurable criteria of acceptance — agreed before any money is committed.
+      </p>
+    </div>
+    <div>
+      <div class="rn">№ 2</div>
+      <h3>The money is held, not sent</h3>
+      <p>
+        The client approves the sum at PayPal checkout. It is authorised and held
+        in escrow — in neither party's pocket while the work is done.
+      </p>
+    </div>
+    <div>
+      <div class="rn">№ 3</div>
+      <h3>Examination, then settlement</h3>
+      <p>
+        The delivery is checked against every criterion, with the evidence cited.
+        The earned share is paid out; the remainder returns to the client.
+      </p>
+    </div>
+  </div>
+
+  <div id="entryForm">
+    {#if role === "client"}
+      <section id="clientPanel">
+        <div class="sec-head">
+          <div class="sc">New instrument — drawn up by the client</div>
+          <div class="sc f">Drafted by AI from the brief</div>
+        </div>
+        <p class="hint">Write a brief; the AI turns it into a contract with milestones and weighted criteria of acceptance.</p>
+        <label for="brief">Job brief</label>
+        <textarea id="brief" rows="3" bind:value={brief}></textarea>
+        <label for="clientEmail">Client email</label>
+        <input id="clientEmail" bind:value={clientEmail} />
+        <label for="freelancerEmail">Freelancer email</label>
+        <input id="freelancerEmail" bind:value={freelancerEmail} />
+        <label for="totalAmount">Total amount (USD)</label>
+        <input id="totalAmount" type="number" min="1" bind:value={totalAmount} />
+        <button class="action" disabled={busyKey !== null} onclick={createContract}>
+          {busyKey === "create" ? "Working…" : "Draw up the contract"}
+        </button>
+      </section>
+    {:else}
+      <section id="freelancerPanel">
+        <div class="sec-head">
+          <div class="sc">Delivery — submitted by the freelancer</div>
+          <div class="sc f">Against a funded milestone</div>
+        </div>
+        <p class="hint">Pick a funded milestone below, then paste the delivery here and submit it from the milestone row.</p>
+        <label for="deliverable">Deliverable content (text or link)</label>
+        <textarea id="deliverable" rows="4" bind:value={deliverable}></textarea>
+      </section>
+    {/if}
+  </div>
+
+  <section id="sectionContracts">
+    <div class="sec-head">
+      <div class="sc">The Register — contracts &amp; milestones</div>
+      <div class="sc f">{contracts.length} instruments on the books</div>
+    </div>
+    <p class="hint">Every contract below is real data from this live demo. Verification verdicts cite the evidence the AI relied on.</p>
+    <div id="contracts">
+      {#if !contracts.length}
+        <p class="hint">No contracts yet — the register is empty.</p>
+      {/if}
+      {#each contracts as contract (contract.id)}
+        <ContractCard
+          {contract}
+          {role}
+          {busyKey}
+          onAction={act}
+          onFund={fundMilestone}
+          onSubmit={submitWork}
+        />
+      {/each}
+    </div>
+  </section>
+
+  <section id="sectionLedger">
+    <div class="sec-head">
+      <div class="sc">Ledger — evidence trail</div>
+      <div class="sc f">{events.length} entries recorded</div>
+    </div>
+    <p class="hint">Every step, with its PayPal transaction ID. If a dispute ever happens, this trail already exists.</p>
+    <LedgerGrid {events} />
+  </section>
+
+  <details class="appendix">
+    <summary>Appendix — last API response (JSON), kept for the developer</summary>
+    <pre>{lastJson}</pre>
+  </details>
+
+  <div class="foot">
+    <div class="sc">ProofPay — built for the PayPal AI Hackathon</div>
+    <div class="sc">Every entry in this register cites its evidence</div>
   </div>
 </div>

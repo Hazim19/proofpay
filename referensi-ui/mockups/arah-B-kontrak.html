@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ProofPay — Direction B · Contract &amp; Verdict</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#F2F2ED; --ink:#101010; --acc:#FF4D00; --mute:#5C5C55; }
+  *{margin:0;padding:0;box-sizing:border-box;border-radius:0!important;}
+  body{background:var(--bg);color:var(--ink);font-family:"Archivo",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;}
+  .page{max-width:1440px;margin:0 auto;padding:0 56px 56px;
+    background-image:repeating-linear-gradient(90deg, rgba(16,16,16,.045) 0 1px, transparent 1px 166px);}
+
+  .top{display:flex;justify-content:space-between;align-items:baseline;border-bottom:3px solid var(--ink);padding:22px 0 16px;}
+  .top .logo{font-weight:900;font-stretch:125%;font-size:34px;text-transform:uppercase;}
+  .top .logo .sq{display:inline-block;width:12px;height:12px;background:var(--acc);margin-left:6px;}
+  .top .mono{font-size:13px;text-transform:uppercase;}
+  .top .mono b{color:var(--acc);}
+
+  /* ---- milestone header ---- */
+  .mshead{display:grid;grid-template-columns:120px 1fr auto;gap:24px;margin-top:40px;align-items:start;}
+  .mshead .idx{font-family:"IBM Plex Mono",monospace;font-size:13px;line-height:1.8;color:var(--mute);text-transform:uppercase;}
+  .mshead .idx b{display:block;color:var(--ink);font-size:15px;}
+  .mshead h1{font-weight:860;font-stretch:122%;text-transform:uppercase;font-size:58px;line-height:1.0;}
+  .mshead h1 small{display:block;font-size:24px;font-weight:700;color:var(--mute);margin-top:12px;letter-spacing:.01em;}
+  .mshead .amt{text-align:right;}
+  .mshead .amt .lab{font-family:"IBM Plex Mono",monospace;font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--mute);}
+  .mshead .amt .v{font-weight:900;font-stretch:120%;font-size:72px;line-height:1;font-variant-numeric:tabular-nums;}
+  .mshead .amt .st{display:inline-block;margin-top:10px;background:var(--ink);color:#F2F2ED;
+    font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:13px;text-transform:uppercase;padding:7px 14px;}
+
+  /* ---- criteria spec table ---- */
+  .spec{margin-top:46px;border:2.5px solid var(--ink);background:var(--bg);}
+  .spec .shead{display:grid;grid-template-columns:90px 1fr 130px 170px;border-bottom:2.5px solid var(--ink);
+    font-family:"IBM Plex Mono",monospace;font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--mute);}
+  .spec .shead>div{padding:12px 20px;}
+  .row{display:grid;grid-template-columns:90px 1fr 130px 170px;border-bottom:1.5px solid var(--ink);}
+  .row:last-child{border-bottom:none;}
+  .row>div{padding:20px;}
+  .row .no{font-weight:900;font-stretch:125%;font-size:34px;line-height:1;}
+  .row .crit .c{font-size:20px;font-weight:760;line-height:1.3;text-transform:uppercase;}
+  .row .crit .e{font-family:"IBM Plex Mono",monospace;font-size:13px;line-height:1.6;color:#33332E;margin-top:9px;max-width:640px;}
+  .row .wt{font-weight:880;font-stretch:118%;font-size:40px;font-variant-numeric:tabular-nums;}
+  .row .wt small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:11px;color:var(--mute);letter-spacing:.12em;margin-top:4px;}
+  .find{display:inline-block;font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:15px;
+    text-transform:uppercase;padding:9px 16px;background:var(--ink);color:#F2F2ED;}
+  .find.part{background:var(--acc);color:#101010;}
+
+  /* ---- deliverable line ---- */
+  .deliv{display:grid;grid-template-columns:170px 1fr;gap:24px;margin-top:36px;}
+  .deliv .lab{font-family:"IBM Plex Mono",monospace;font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--mute);padding-top:6px;}
+  .deliv p{font-size:18.5px;font-weight:550;line-height:1.5;max-width:980px;}
+  .deliv p b{font-weight:800;}
+  .deliv .mono{font-size:14px;}
+
+  /* ---- verdict block ---- */
+  .verdict{margin-top:44px;background:var(--ink);color:#F2F2ED;display:grid;grid-template-columns:auto 1fr;gap:56px;padding:40px 44px;align-items:center;}
+  .verdict .big{font-weight:900;font-stretch:125%;font-size:190px;line-height:.9;font-variant-numeric:tabular-nums;}
+  .verdict .big sup{font-size:70px;color:var(--acc);}
+  .verdict .vlab{font-family:"IBM Plex Mono",monospace;font-size:13px;text-transform:uppercase;letter-spacing:.16em;color:#B9B9B0;}
+  .verdict h3{font-weight:850;font-stretch:120%;text-transform:uppercase;font-size:44px;line-height:1.05;margin-top:10px;}
+  .verdict h3 .acc{color:var(--acc);}
+  .verdict .meta{font-family:"IBM Plex Mono",monospace;font-size:13.5px;margin-top:16px;line-height:1.8;color:#D8D8D0;text-transform:uppercase;}
+  .verdict .meta b{color:#F2F2ED;}
+  .bar{height:14px;background:#33332E;margin-top:22px;position:relative;}
+  .bar i{position:absolute;left:0;top:0;bottom:0;width:85%;background:var(--acc);}
+
+  /* ---- settlement ---- */
+  .settle{display:grid;grid-template-columns:1fr 1fr;border:2.5px solid var(--ink);border-top:none;background:var(--bg);}
+  .settle>div{padding:24px 28px 26px;}
+  .settle>div:first-child{border-right:1.5px solid var(--ink);}
+  .settle .lab{font-family:"IBM Plex Mono",monospace;font-size:12.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--mute);display:flex;justify-content:space-between;}
+  .settle .lab .arr{color:var(--acc);font-weight:700;font-size:16px;}
+  .settle .v{font-weight:900;font-stretch:120%;font-size:78px;line-height:1.05;font-variant-numeric:tabular-nums;margin-top:8px;}
+  .settle .v small{font-size:30px;font-weight:800;color:var(--mute);}
+  .settle .note{font-size:15px;font-weight:550;margin-top:6px;color:#33332E;}
+
+  /* ---- refs grid ---- */
+  .refs{display:grid;grid-template-columns:repeat(3,1fr);border:2.5px solid var(--ink);margin-top:44px;background:var(--bg);}
+  .refs>div{padding:16px 22px 18px;border-right:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);}
+  .refs>div:nth-child(3n){border-right:none;}
+  .refs>div:nth-child(n+4){border-bottom:none;}
+  .refs .k{font-family:"IBM Plex Mono",monospace;font-size:11.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--mute);}
+  .refs .v{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:17.5px;margin-top:6px;}
+  .foot{display:flex;justify-content:space-between;margin-top:26px;font-family:"IBM Plex Mono",monospace;
+    font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--mute);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="top">
+    <div class="logo">ProofPay<span class="sq"></span></div>
+    <div class="mono">Contract <b>ct_3e86782b</b> — Wedding Photography Studio Website</div>
+    <div class="mono">Record 01 / 02 milestones</div>
+  </div>
+
+  <div class="mshead">
+    <div class="idx"><b>MS/01</b>Funded<br>Submitted<br>Verified<br>Released</div>
+    <h1>UI/UX Design Mockups<small>Milestone 1 of 2 — contract total USD 600.00</small></h1>
+    <div class="amt">
+      <div class="lab">Milestone value · USD</div>
+      <div class="v">250.00</div>
+      <div class="st">■ Released</div>
+    </div>
+  </div>
+
+  <div class="spec">
+    <div class="shead"><div>№</div><div>Criterion / evidence on record</div><div>Weight</div><div>Finding</div></div>
+    <div class="row">
+      <div class="no">01</div>
+      <div class="crit">
+        <div class="c">Figma file — desktop + mobile layouts, all three pages</div>
+        <div class="e">EVIDENCE: Six frames delivered — Portfolio Gallery, Packages, Booking Inquiry Form, each at 1440px desktop and 390px mobile. Gallery grid, pricing tiers and inquiry fields placed.</div>
+      </div>
+      <div class="wt">40<small>PERCENT</small></div>
+      <div><span class="find">Pass</span></div>
+    </div>
+    <div class="row">
+      <div class="no">02</div>
+      <div class="crit">
+        <div class="c">Clickable prototype linking all three pages</div>
+        <div class="e">EVIDENCE: Present-mode navigation wired Gallery → Packages → Booking on every page; “Check availability” routes to the booking form with package pre-selected.</div>
+      </div>
+      <div class="wt">30<small>PERCENT</small></div>
+      <div><span class="find">Pass</span></div>
+    </div>
+    <div class="row">
+      <div class="no">03</div>
+      <div class="crit">
+        <div class="c">Style guide — hex palette, font hierarchy, button states</div>
+        <div class="e">EVIDENCE: Palette delivered in hex — Ink #2B2118, Gold #C9A24B, Ivory #F7F2E9. Font hierarchy scale and button-state specifications expressly noted as not yet documented.</div>
+      </div>
+      <div class="wt">30<small>PERCENT</small></div>
+      <div><span class="find part">Partial</span></div>
+    </div>
+  </div>
+
+  <div class="deliv">
+    <div class="lab">Deliverable<br>as submitted</div>
+    <p>One Figma file: six frames, the wired prototype, and a style-guide page with the colour palette.
+    The freelancer's note states <b>font hierarchy</b> and <b>button states</b> are outstanding, to follow in the next revision.
+    The shortfall is priced into the verdict — <span class="mono">15% WITHHELD</span> — not negotiated after the fact.</p>
+  </div>
+
+  <div class="verdict">
+    <div class="big">85<sup>%</sup></div>
+    <div>
+      <div class="vlab">AI verification — final</div>
+      <h3>Verdict: <span class="acc">Partial</span> — release 85% of held funds</h3>
+      <div class="meta">Verifier <b>ai:gemini-3.8-flash</b> · Criteria passed <b>2 / 3</b> · Weighted score <b>0.85</b> · Checked <b>2026-10-28</b></div>
+      <div class="bar"><i></i></div>
+    </div>
+  </div>
+
+  <div class="settle">
+    <div>
+      <div class="lab"><span>Paid out → Freelancer</span><span class="arr">→</span></div>
+      <div class="v"><small>USD</small> 212.50</div>
+      <div class="note">The earned share. Released by capture + PayPal Payouts, batch FTT44H8732SPJ.</div>
+    </div>
+    <div>
+      <div class="lab"><span>Refunded → Client</span><span class="arr">→</span></div>
+      <div class="v"><small>USD</small> 37.50</div>
+      <div class="note">The unearned share. Returned against the original authorisation.</div>
+    </div>
+  </div>
+
+  <div class="refs">
+    <div><div class="k">PayPal Order</div><div class="v">64S61796JT481531E</div></div>
+    <div><div class="k">Authorisation</div><div class="v">08413488AT325521Y</div></div>
+    <div><div class="k">Capture</div><div class="v">9YW53158V3301540E</div></div>
+    <div><div class="k">Payout batch</div><div class="v">FTT44H8732SPJ</div></div>
+    <div><div class="k">Refund</div><div class="v">9CW71170H4739574J</div></div>
+    <div><div class="k">Next milestone</div><div class="v">M2 · USD 350.00 · DRAFT</div></div>
+  </div>
+
+  <div class="foot">
+    <div>ProofPay — every release cites its evidence</div>
+    <div>End of record · ct_3e86782b / M1</div>
+  </div>
+
+</div>
+</body>
+</html>

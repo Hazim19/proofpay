@@ -26,12 +26,12 @@
         {
           field: "type",
           headerName: "Event",
-          width: 175,
+          width: 185,
           cellRenderer: (p: { value?: string }) =>
             `<span class="ev ${EV_CLASS[p.value ?? ""] || ""}">${esc(p.value)}</span>`,
         },
-        { field: "contractId", headerName: "Contract", width: 135 },
-        { field: "milestoneId", headerName: "Milestone", width: 155 },
+        { field: "contractId", headerName: "Contract", width: 140 },
+        { field: "milestoneId", headerName: "Milestone", width: 160 },
         {
           field: "detail",
           headerName: "Detail",
@@ -57,36 +57,64 @@
 <div bind:this={gridEl} class="ag-theme-quartz ledger-grid"></div>
 
 <style>
+  /* AG Grid (sponsor requirement) dressed as a page of the register:
+     paper ground, ruled rows, mono type, small-caps column heads,
+     no quartz chrome, no blue. */
   .ledger-grid {
     height: 420px;
     width: 100%;
-    --ag-font-family: "Inter", system-ui, sans-serif;
-    --ag-font-size: 13px;
-    --ag-border-color: var(--line-soft);
-    --ag-row-border-color: var(--line-soft);
-    --ag-header-background-color: #f9fafb;
+    margin-top: 14px;
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+    --ag-font-family: var(--mono);
+    --ag-font-size: 12.5px;
+    --ag-background-color: var(--paper);
+    --ag-foreground-color: var(--ink);
+    --ag-header-background-color: var(--paper);
+    --ag-header-foreground-color: var(--faint);
+    --ag-border-color: var(--rule);
+    --ag-row-border-color: var(--rule);
+    --ag-odd-row-background-color: var(--paper);
+    --ag-row-hover-color: rgba(30, 86, 49, 0.05);
+    --ag-selected-row-background-color: rgba(30, 86, 49, 0.08);
     --ag-cell-horizontal-padding: 14px;
+    --ag-header-height: 40px;
+    --ag-row-height: 37px;
+  }
+  .ledger-grid :global(.ag-root-wrapper) {
+    border: none;
+    background: var(--paper);
+  }
+  .ledger-grid :global(.ag-header) {
+    border-bottom: 1px solid var(--ink);
+  }
+  .ledger-grid :global(.ag-header-cell-label) {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .ledger-grid :global(.ag-cell) {
+    display: flex;
+    align-items: center;
   }
   .ledger-grid :global(.ev) {
+    font-family: var(--mono);
     font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: #f2f4f7;
-    color: var(--secondary);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
     white-space: nowrap;
   }
   .ledger-grid :global(.ev.money) {
-    background: var(--green-bg);
     color: var(--green);
   }
   .ledger-grid :global(.ev.ai) {
-    background: var(--violet-bg);
-    color: var(--violet);
+    color: var(--stamp);
   }
   .ledger-grid :global(.ev.fund) {
-    background: var(--blue-bg);
-    color: var(--blue);
+    color: var(--ink);
   }
 </style>

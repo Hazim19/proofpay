@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ProofPay — Direction A · Contract &amp; Verdict</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#FAF6EE; --ink:#1B1712; --green:#1E5631; --stamp:#9A3B26;
+    --rule:#CFC4A8; --faint:#6E6350;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--paper);color:var(--ink);
+    font-family:"Newsreader",Georgia,serif;font-size:18.5px;line-height:1.5;}
+  .page{max-width:1330px;margin:0 auto;padding:48px 70px 64px;}
+  .mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;}
+  .sc{font-family:"IBM Plex Mono",monospace;text-transform:uppercase;letter-spacing:.2em;font-size:11.5px;}
+
+  .top{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--ink);padding-bottom:10px;}
+  .top .brand{font-family:"Fraunces",serif;font-weight:900;font-size:30px;}
+  .top .brand span{color:var(--green);}
+  .top .sc{color:var(--faint);}
+
+  h1.title{font-family:"Fraunces",serif;font-weight:800;font-size:44px;line-height:1.13;margin-top:30px;max-width:940px;}
+  .parties{display:flex;gap:44px;margin-top:16px;color:#40382C;font-size:16.5px;flex-wrap:wrap;}
+  .parties b{font-weight:600;color:var(--ink);}
+  .parties .mono{font-size:13.5px;}
+
+  .ms-head{display:flex;justify-content:space-between;align-items:baseline;margin-top:38px;
+    border-top:2px solid var(--ink);border-bottom:1px solid var(--ink);padding:12px 0 10px;}
+  .ms-head .t{font-family:"Fraunces",serif;font-weight:700;font-size:27px;}
+  .ms-head .a{font-family:"Fraunces",serif;font-weight:800;font-size:27px;font-variant-numeric:tabular-nums;}
+  .ms-head .st{font-family:"IBM Plex Mono",monospace;font-size:12.5px;letter-spacing:.14em;color:var(--green);font-weight:600;}
+
+  /* ---- criteria ledger ---- */
+  table{width:100%;border-collapse:collapse;margin-top:6px;}
+  th{font-family:"IBM Plex Mono",monospace;text-transform:uppercase;letter-spacing:.16em;font-size:11px;
+     color:var(--faint);text-align:left;padding:14px 10px 8px;border-bottom:1px solid var(--rule);font-weight:500;}
+  td{padding:18px 10px 16px;border-bottom:1px solid var(--rule);vertical-align:top;}
+  td.no{font-family:"Fraunces",serif;font-style:italic;font-weight:600;font-size:20px;color:var(--faint);width:52px;}
+  td.crit{width:400px;}
+  td.crit .c{font-size:19.5px;font-weight:600;line-height:1.35;}
+  td.wt{font-family:"IBM Plex Mono",monospace;font-size:21px;font-weight:600;width:84px;}
+  td.find{width:150px;}
+  .f-pass{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:14px;letter-spacing:.1em;color:var(--green);}
+  .f-part{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:14px;letter-spacing:.1em;color:var(--stamp);}
+  td.ev{font-style:italic;font-size:15.5px;color:#4A4234;line-height:1.45;}
+
+  /* ---- deliverable ---- */
+  .deliv{margin-top:34px;}
+  .deliv .sc{color:var(--faint);border-bottom:1px solid var(--rule);display:block;padding-bottom:7px;}
+  .deliv p{margin-top:14px;font-size:18px;max-width:1020px;color:#2C261D;}
+  .deliv p b{font-weight:600;}
+  .deliv .mono{font-size:14.5px;font-style:normal;}
+
+  /* ---- verdict & settlement ---- */
+  .verdict{display:grid;grid-template-columns:470px 1fr;gap:70px;margin-top:48px;
+    border-top:2px solid var(--ink);padding-top:36px;position:relative;}
+  .stamp{border:3px double var(--stamp);color:var(--stamp);padding:26px 30px 22px;
+    transform:rotate(-3.5deg);text-align:center;max-width:440px;background:rgba(154,59,38,.03);}
+  .stamp .s1{font-family:"IBM Plex Mono",monospace;font-weight:600;letter-spacing:.3em;font-size:15px;}
+  .stamp .s2{font-family:"Fraunces",serif;font-weight:900;font-size:64px;line-height:1.05;margin-top:6px;}
+  .stamp .s3{font-family:"IBM Plex Mono",monospace;font-size:12.5px;letter-spacing:.12em;margin-top:8px;line-height:1.7;}
+  .stamp .s3 .mono{letter-spacing:0;}
+  .settle h4{font-family:"IBM Plex Mono",monospace;text-transform:uppercase;letter-spacing:.2em;
+    font-size:12px;color:var(--faint);font-weight:500;margin-bottom:8px;}
+  .settle .row{display:flex;justify-content:space-between;align-items:baseline;
+    padding:13px 0 11px;border-bottom:1px solid var(--rule);}
+  .settle .row .k{font-size:19px;}
+  .settle .row .k i{color:var(--faint);font-size:16px;}
+  .settle .row .v{font-family:"IBM Plex Mono",monospace;font-size:23px;font-weight:600;}
+  .settle .row.total{border-bottom:2px solid var(--ink);}
+  .settle .row.total .v{color:var(--green);}
+  .settle .row.refund .v{color:var(--stamp);}
+
+  /* ---- paypal register ---- */
+  .refs{margin-top:46px;border-top:1px solid var(--rule);padding-top:16px;
+    display:grid;grid-template-columns:repeat(3,1fr);gap:10px 44px;}
+  .refs div{font-family:"IBM Plex Mono",monospace;font-size:13px;display:flex;justify-content:space-between;
+    border-bottom:1px dotted var(--rule);padding-bottom:6px;}
+  .refs div span:first-child{color:var(--faint);text-transform:uppercase;letter-spacing:.12em;font-size:11px;padding-top:2px;}
+  .sign{display:flex;justify-content:space-between;align-items:flex-end;margin-top:44px;}
+  .sign .sig{font-family:"Fraunces",serif;font-style:italic;font-weight:600;font-size:30px;}
+  .sign .cap{font-family:"IBM Plex Mono",monospace;text-transform:uppercase;letter-spacing:.16em;font-size:11px;color:var(--faint);margin-top:2px;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="top">
+    <div class="brand">Proof<span>Pay</span></div>
+    <div class="sc">Instrument № ct_3e86782b</div>
+    <div class="sc">Examination &amp; Settlement</div>
+  </div>
+
+  <h1 class="title">Wedding Photography Studio Website Design &amp; Development</h1>
+  <div class="parties">
+    <div><b>Client</b> — <span class="mono">sb-rwo7v53559790@personal.example.com</span></div>
+    <div><b>Freelancer</b> — <span class="mono">sb-36w47w53581671@personal.example.com</span></div>
+    <div><b>Instrument total</b> — <span class="mono">USD 600.00</span></div>
+  </div>
+
+  <div class="ms-head">
+    <div class="t">Milestone 1 — UI/UX Design Mockups</div>
+    <div class="st">SETTLED — RELEASED</div>
+    <div class="a">USD 250.00</div>
+  </div>
+
+  <table>
+    <tr><th>№</th><th>Criterion of acceptance</th><th>Weight</th><th>Finding</th><th>Evidence cited</th></tr>
+    <tr>
+      <td class="no">1.</td>
+      <td class="crit"><div class="c">Figma file with desktop and mobile layouts for all three pages</div></td>
+      <td class="wt">40%</td>
+      <td class="find"><span class="f-pass">SATISFIED</span></td>
+      <td class="ev">The file contains six frames — Portfolio Gallery, Packages and Booking Inquiry Form, each laid out at desktop (1440px) and mobile (390px), with gallery grid, pricing tiers and form fields placed.</td>
+    </tr>
+    <tr>
+      <td class="no">2.</td>
+      <td class="crit"><div class="c">Clickable prototype linking all three pages</div></td>
+      <td class="wt">30%</td>
+      <td class="find"><span class="f-pass">SATISFIED</span></td>
+      <td class="ev">Present-mode wiring connects Gallery → Packages → Booking from every page; “Check availability” leads to the booking form with the package pre-selected.</td>
+    </tr>
+    <tr>
+      <td class="no">3.</td>
+      <td class="crit"><div class="c">Style guide with hex palette, font hierarchy and button states</div></td>
+      <td class="wt">30%</td>
+      <td class="find"><span class="f-part">MET IN PART</span></td>
+      <td class="ev">Palette delivered in hex — Ink #2B2118, Gold #C9A24B, Ivory #F7F2E9. The font hierarchy scale and the button-state specifications are expressly noted as not yet documented.</td>
+    </tr>
+  </table>
+
+  <div class="deliv">
+    <span class="sc">Deliverable as submitted</span>
+    <p>One Figma file containing the six frames named above, the wired prototype, and a style-guide page carrying the colour palette. The freelancer's own note records that the <b>font hierarchy</b> and <b>interactive button states</b> remain outstanding and will be added in the next revision — the shortfall is priced into the settlement below, not argued away.</p>
+  </div>
+
+  <div class="verdict">
+    <div>
+      <div class="stamp">
+        <div class="s1">AI VERIFIED · PARTIAL</div>
+        <div class="s2">Release 85%</div>
+        <div class="s3">Examined criterion by criterion<br>
+        <span class="mono">verifier ai:gemini-3.8-flash</span><br>28 October 2026</div>
+      </div>
+    </div>
+    <div class="settle">
+      <h4>Settlement of Milestone 1 — USD 250.00 authorised &amp; held</h4>
+      <div class="row total">
+        <div class="k">Paid to the freelancer <i>— the earned 85%</i></div>
+        <div class="v">USD 212.50</div>
+      </div>
+      <div class="row refund">
+        <div class="k">Returned to the client <i>— the unearned 15%</i></div>
+        <div class="v">USD 37.50</div>
+      </div>
+      <div class="row">
+        <div class="k">Retained in escrow</div>
+        <div class="v">USD 0.00</div>
+      </div>
+      <p style="margin-top:14px;font-style:italic;color:var(--faint);font-size:16px;">Payment follows the verdict exactly: the share that was proven moves, the share that was not returns.</p>
+    </div>
+  </div>
+
+  <div class="refs">
+    <div><span>PayPal Order</span><span>64S61796JT481531E</span></div>
+    <div><span>Authorisation</span><span>08413488AT325521Y</span></div>
+    <div><span>Capture</span><span>9YW53158V3301540E</span></div>
+    <div><span>Payout batch</span><span>FTT44H8732SPJ</span></div>
+    <div><span>Refund</span><span>9CW71170H4739574J</span></div>
+    <div><span>Milestone 2</span><span>USD 350.00 · draft</span></div>
+  </div>
+
+  <div class="sign">
+    <div>
+      <div class="sig">ProofPay</div>
+      <div class="cap">Settled by the verification engine · no release without evidence</div>
+    </div>
+    <div class="cap">Page 1 of the settlement record</div>
+  </div>
+
+</div>
+</body>
+</html>

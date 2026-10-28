@@ -108,3 +108,61 @@ export function sumEvents(
     .filter((e) => types.includes(e.type))
     .reduce((s, e) => s + (Number(e.detail?.amount) || 0), 0);
 }
+
+/** Split an amount into currency word + figure, for display typography
+    (small "USD" beside a large serif figure, as in the register). */
+export function moneyFig(
+  amount: unknown,
+  currency?: string,
+): { cur: string; num: string } {
+  const n = Number(amount);
+  return {
+    cur: currency || "USD",
+    num: Number.isFinite(n) ? n.toFixed(2) : String(amount ?? ""),
+  };
+}
+
+/** "28 October 2026" from an ISO timestamp (read in UTC so the day the
+    register shows never shifts with the viewer's timezone). */
+export function longDate(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** Register wording for a milestone's present state. */
+export function milestoneStateLabel(m: Milestone): string {
+  switch (m.status) {
+    case "draft":
+      return "Draft — awaiting funding";
+    case "awaiting_approval":
+      return "Awaiting client approval";
+    case "funded":
+      return "Funded — held in escrow";
+    case "submitted":
+      return m.verification
+        ? "Examined — awaiting settlement"
+        : "Submitted — under examination";
+    case "released":
+      return "Settled — released";
+    case "failed":
+      return "Examination failed — funds held";
+    default:
+      return m.status;
+  }
+}
+
+/** Examination-table wording for a criterion finding. */
+export function findingLabel(status: string): string {
+  return status === "pass"
+    ? "Satisfied"
+    : status === "partial"
+      ? "Met in part"
+      : "Not met";
+}

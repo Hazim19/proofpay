@@ -1,12 +1,13 @@
 <script lang="ts">
   import type { Contract, Milestone } from "../lib/types.ts";
-  import { money, statusLabel } from "../lib/format.ts";
+  import { findingLabel, milestoneStateLabel, money } from "../lib/format.ts";
   import Stepper from "./Stepper.svelte";
   import VerdictPanel from "./VerdictPanel.svelte";
 
   let {
     contract,
     milestone,
+    index,
     role,
     busyKey,
     onAction,
@@ -15,6 +16,7 @@
   }: {
     contract: Contract;
     milestone: Milestone;
+    index: number;
     role: "client" | "freelancer";
     busyKey: string | null;
     onAction: (contractId: string, milestoneId: string, action: string) => void;
@@ -31,7 +33,7 @@
   const ids = $derived(
     (
       [
-        ["Order", m.paypalOrderId],
+        ["PayPal Order", m.paypalOrderId],
         ["Authorisation", m.paypalAuthorizationId],
         ["Capture", m.paypalCaptureId],
         ["Refund", m.paypalRefundId],
@@ -47,46 +49,12 @@
 
 <div class="milestone" id="milestone-{m.id}">
   <div class="ms-head">
-    <span class="ms-title">{m.title}</span>
-    <span class="ms-amount">{money(m.amount, m.currency)}</span>
-    <span class="badge {m.status}">{statusLabel(m.status)}</span>
+    <div class="t">Milestone {index + 1} — {m.title}</div>
+    <div class="st {m.status}">{milestoneStateLabel(m)}</div>
+    <div class="a">{money(m.amount, m.currency)}</div>
   </div>
 
-  {#if ids.length}
-    <div class="ids">
-      <span class="k">PayPal</span>
-      {#each ids as [k, v]}
-        <span class="mono chip-id">{k} {v}</span>
-      {/each}
-    </div>
-  {/if}
-
   <Stepper {milestone} />
-
-  <ul class="criteria">
-    {#each m.criteria as cr}
-      {@const vc = vById.get(cr.id)}
-      <li>
-        <span class="w">{Math.round(cr.weight * 100)}%</span>
-        <div class="c-main">
-          <span class="lbl">{cr.label}</span>
-          {#if vc}<div class="reason">{vc.reason}</div>{/if}
-        </div>
-        {#if vc}<span class="verdict {vc.status}">{vc.status}</span>{/if}
-      </li>
-    {/each}
-  </ul>
-
-  {#if m.deliverable}
-    <div class="deliverable">
-      <div class="d-title">Deliverable submitted</div>
-      <div class="d-body">{m.deliverable.content}</div>
-    </div>
-  {/if}
-
-  {#if m.verification}
-    <VerdictPanel {milestone} />
-  {/if}
 
   <div class="ms-actions">
     {#if role === "client" && m.status === "draft"}
@@ -115,175 +83,262 @@
       </button>
     {/if}
   </div>
+
+  <div class="exam-wrap">
+  <table class="exam">
+    <thead>
+      <tr>
+        <th>№</th>
+        <th>Criterion of acceptance</th>
+        <th>Weight</th>
+        <th>Finding</th>
+        <th>Evidence cited</th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each m.criteria as cr, ci (cr.id)}
+        {@const vc = vById.get(cr.id)}
+        <tr>
+          <td class="no">{ci + 1}.</td>
+          <td class="crit"><div class="c">{cr.label}</div></td>
+          <td class="wt">{Math.round(cr.weight * 100)}%</td>
+          <td class="find">
+            {#if vc}
+              <span class="f-{vc.status}">{findingLabel(vc.status)}</span>
+            {:else}
+              <span class="f-none">—</span>
+            {/if}
+          </td>
+          <td class="ev">{vc ? vc.reason : "Not yet examined."}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+  </div>
+
+  {#if m.deliverable}
+    <div class="deliv">
+      <span class="sc">Deliverable as submitted</span>
+      <p>{m.deliverable.content}</p>
+    </div>
+  {/if}
+
+  {#if m.verification}
+    <VerdictPanel {milestone} index={index} />
+  {/if}
+
+  {#if ids.length}
+    <div class="refs">
+      {#each ids as [k, v]}
+        <div><span>{k}</span><span>{v}</span></div>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <style>
   .milestone {
-    border: 1px solid var(--line-soft);
-    border-radius: 16px;
-    padding: 18px 20px;
-    margin-top: 14px;
-    background: #fdfdfe;
+    margin-top: 10px;
+    padding-bottom: 26px;
   }
   .ms-head {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 18px;
+    margin-top: 30px;
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--ink);
+    padding: 12px 0 10px;
   }
-  .ms-title {
-    font-weight: 600;
-    color: var(--ink);
-    font-size: 15px;
+  .ms-head .t {
+    font-family: var(--serif-display);
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 1.2;
   }
-  .ms-amount {
+  .ms-head .st {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
     font-weight: 600;
-    color: var(--ink);
-    font-variant-numeric: tabular-nums;
-  }
-  .badge {
-    margin-left: auto;
-    font-size: 11.5px;
-    font-weight: 600;
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: #f2f4f7;
-    color: var(--secondary);
-    border: 1px solid var(--line-soft);
     white-space: nowrap;
   }
-  .badge.funded,
-  .badge.submitted {
-    background: var(--blue-bg);
-    color: var(--blue);
-    border-color: #b2ddff;
-  }
-  .badge.awaiting_approval {
-    background: var(--amber-bg);
-    color: var(--amber);
-    border-color: #fedf89;
-  }
-  .badge.released {
-    background: var(--green-bg);
+  .ms-head .st.released {
     color: var(--green);
-    border-color: #a6f4c5;
   }
-  .badge.failed {
-    background: var(--red-bg);
+  .ms-head .st.failed {
     color: var(--red);
-    border-color: #fecdca;
   }
-  .ids {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-    margin-top: 10px;
-  }
-  .ids .k {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  .chip-id {
-    background: #f2f4f7;
-    border: 1px solid var(--line-soft);
-    padding: 2px 8px;
-    border-radius: 999px;
-  }
-  .criteria {
-    list-style: none;
-    margin: 12px 0 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .criteria li {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    background: #fff;
-    border: 1px solid var(--line-soft);
-    border-radius: 10px;
-    padding: 10px 12px;
-  }
-  .criteria .w {
-    flex: none;
-    font-size: 11.5px;
-    font-weight: 600;
-    color: var(--accent);
-    background: var(--accent-bg);
-    border-radius: 999px;
-    padding: 2px 8px;
-    font-variant-numeric: tabular-nums;
-  }
-  .c-main {
-    flex: 1;
-    min-width: 0;
-  }
-  .criteria .lbl {
+  .ms-head .st.funded,
+  .ms-head .st.submitted {
     color: var(--ink);
-    font-size: 13.5px;
   }
-  .criteria .reason {
-    margin-top: 3px;
-    font-size: 12.5px;
-    color: var(--secondary);
-    line-height: 1.5;
-  }
-  .verdict {
-    flex: none;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    padding: 3px 9px;
-    border-radius: 999px;
-  }
-  .verdict.pass {
-    background: var(--green-bg);
-    color: var(--green);
-  }
-  .verdict.partial {
-    background: var(--amber-bg);
-    color: var(--amber);
-  }
-  .verdict.fail {
-    background: var(--red-bg);
-    color: var(--red);
-  }
-  .deliverable {
-    margin-top: 14px;
-    background: #fffcf5;
-    border: 1px solid #f5e6c4;
-    border-radius: 10px;
-    padding: 12px 14px;
-  }
-  .d-title {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: #b54708;
-    margin-bottom: 6px;
-  }
-  .d-body {
-    font-size: 13.5px;
-    line-height: 1.6;
-    color: var(--body);
-    white-space: pre-wrap;
-    word-break: break-word;
+  .ms-head .a {
+    font-family: var(--serif-display);
+    font-weight: 800;
+    font-size: 26px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
   .ms-actions {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-    margin-top: 14px;
+    margin-top: 16px;
   }
   .ms-actions:empty {
     display: none;
+  }
+
+  /* ------------------------------------------------ examination table */
+  .exam-wrap {
+    overflow-x: auto;
+  }
+  table.exam {
+    width: 100%;
+    min-width: 680px;
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+  table.exam th {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 11px;
+    color: var(--faint);
+    text-align: left;
+    padding: 14px 10px 8px;
+    border-bottom: 1px solid var(--rule);
+    font-weight: 500;
+  }
+  table.exam td {
+    padding: 17px 10px 15px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  td.no {
+    font-family: var(--serif-display);
+    font-style: italic;
+    font-weight: 600;
+    font-size: 20px;
+    color: var(--faint);
+    width: 52px;
+  }
+  td.crit {
+    width: 400px;
+  }
+  td.crit .c {
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  td.wt {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    width: 84px;
+  }
+  td.find {
+    width: 150px;
+  }
+  .f-pass {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 13.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--green);
+  }
+  .f-partial {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 13.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--stamp);
+  }
+  .f-fail {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 13.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .f-none {
+    color: var(--faint);
+  }
+  td.ev {
+    font-style: italic;
+    font-size: 15.5px;
+    color: #4a4234;
+    line-height: 1.45;
+  }
+
+  /* ------------------------------------------------------ deliverable */
+  .deliv {
+    margin-top: 32px;
+  }
+  .deliv .sc {
+    color: var(--faint);
+    border-bottom: 1px solid var(--rule);
+    display: block;
+    padding-bottom: 7px;
+  }
+  .deliv p {
+    margin: 14px 0 0;
+    font-size: 17.5px;
+    max-width: 1020px;
+    color: #2c261d;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* ---------------------------------------------------- PayPal register */
+  .refs {
+    margin-top: 44px;
+    border-top: 1px solid var(--rule);
+    padding-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px 44px;
+  }
+  .refs div {
+    font-family: var(--mono);
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px dotted var(--rule);
+    padding-bottom: 6px;
+  }
+  .refs div span:first-child {
+    color: var(--faint);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 11px;
+    padding-top: 2px;
+    white-space: nowrap;
+  }
+  .refs div span:last-child {
+    word-break: break-all;
+    text-align: right;
+  }
+  @media (max-width: 1020px) {
+    .refs {
+      grid-template-columns: 1fr;
+    }
+    td.crit {
+      width: auto;
+    }
+  }
+  @media (max-width: 720px) {
+    .ms-head {
+      flex-wrap: wrap;
+    }
   }
 </style>

@@ -6,83 +6,59 @@
   const states = $derived(stepperStates(milestone));
 </script>
 
-<div class="stepper" aria-label="Milestone lifecycle">
+<div class="stage-line" aria-label="Milestone lifecycle">
   {#each LIFECYCLE as label, i}
-    {#if i > 0}
-      <div class="s-line" class:filled={states[i - 1] === "done"}></div>
-    {/if}
-    <div class="s-step {states[i]}">
-      <div class="s-dot">
-        {states[i] === "done" ? "✓" : states[i] === "fail" ? "✕" : i + 1}
+    <div class="stage {states[i]}">
+      <div class="stage-rule"></div>
+      <div class="stage-label">
+        {states[i] === "done" ? "✓ " : states[i] === "fail" ? "✕ " : ""}{label}
       </div>
-      <div class="s-label">{label}</div>
     </div>
   {/each}
 </div>
 
 <style>
-  .stepper {
+  .stage-line {
     display: flex;
-    align-items: flex-start;
-    margin: 14px 0 4px;
+    gap: 10px;
+    margin: 16px 0 4px;
   }
-  .s-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-    min-width: 52px;
+  .stage {
+    flex: 1;
+    min-width: 0;
   }
-  .s-dot {
-    width: 24px;
-    height: 24px;
-    border-radius: 999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11.5px;
-    font-weight: 600;
-    background: #eaecf0;
-    color: var(--muted);
-    border: 1px solid var(--line);
+  .stage-rule {
+    border-top: 1px solid var(--rule);
   }
-  .s-step.done .s-dot {
-    background: var(--green-bg);
+  .stage.done .stage-rule {
+    border-top: 2px solid var(--green);
+  }
+  .stage.current .stage-rule {
+    border-top: 2px solid var(--ink);
+  }
+  .stage.fail .stage-rule {
+    border-top: 2px solid var(--red);
+  }
+  .stage-label {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 10.5px;
+    color: var(--faint);
+    margin-top: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stage.done .stage-label {
     color: var(--green);
-    border-color: #a6f4c5;
   }
-  .s-step.current .s-dot {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 4px var(--accent-bg);
-  }
-  .s-step.fail .s-dot {
-    background: var(--red-bg);
-    color: var(--red);
-    border-color: #fecdca;
-  }
-  .s-label {
-    font-size: 11px;
-    color: var(--secondary);
-    font-weight: 500;
-  }
-  .s-step.current .s-label {
+  .stage.current .stage-label {
     color: var(--ink);
     font-weight: 600;
   }
-  .s-step.fail .s-label {
+  .stage.fail .stage-label {
     color: var(--red);
     font-weight: 600;
-  }
-  .s-line {
-    flex: 1;
-    height: 2px;
-    background: var(--line);
-    margin-top: 12px;
-    border-radius: 2px;
-  }
-  .s-line.filled {
-    background: #a6f4c5;
   }
 </style>

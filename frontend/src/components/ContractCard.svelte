@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Contract } from "../lib/types.ts";
-  import { money } from "../lib/format.ts";
+  import { longDate, money } from "../lib/format.ts";
   import MilestoneCard from "./MilestoneCard.svelte";
 
   let {
@@ -25,72 +25,124 @@
   const cur = $derived(
     contract.currency || contract.milestones[0]?.currency || "USD",
   );
+  const settledCount = $derived(
+    contract.milestones.filter((m) => m.status === "released").length,
+  );
+  const settledText = $derived(
+    settledCount > 0
+      ? `${settledCount} of ${contract.milestones.length} milestones settled`
+      : "No milestone settled yet",
+  );
 </script>
 
-<div class="contract" id="contract-{contract.id}">
-  <div class="contract-head">
-    <div class="head-main">
-      <span class="title">{contract.title}</span>
-      <div class="meta">
-        <span class="mono">{contract.id}</span> · client {contract.clientEmail} ·
-        freelancer {contract.freelancerEmail}
-      </div>
+<article class="instrument" id="contract-{contract.id}">
+  <div class="sec-head inst-head">
+    <div class="sc">Instrument № {contract.id} — entered in the register {longDate(contract.createdAt)}</div>
+    <div class="sc" class:r={settledCount > 0} class:f={settledCount === 0}>{settledText}</div>
+  </div>
+
+  <h3 class="inst-title">{contract.title}</h3>
+
+  <div class="parties">
+    <div>
+      <div class="who">The Client</div>
+      <div class="addr mono">{contract.clientEmail}</div>
     </div>
-    <div class="total-wrap">
-      <div class="total">{money(total, cur)}</div>
-      <div class="total-cap">total value</div>
+    <div>
+      <div class="who">The Freelancer</div>
+      <div class="addr mono">{contract.freelancerEmail}</div>
     </div>
   </div>
 
-  {#each contract.milestones as milestone (milestone.id)}
-    <MilestoneCard {contract} {milestone} {role} {busyKey} {onAction} {onFund} {onSubmit} />
+  <div class="amount-row">
+    <div class="lab">Total consideration under this instrument</div>
+    <div class="amt">{money(total, cur)}</div>
+  </div>
+
+  {#each contract.milestones as milestone, i (milestone.id)}
+    <MilestoneCard {contract} {milestone} index={i} {role} {busyKey} {onAction} {onFund} {onSubmit} />
   {/each}
-</div>
+</article>
 
 <style>
-  .contract {
-    border-top: 1px solid var(--line-soft);
-    padding: 18px 0 6px;
+  .instrument {
+    margin-top: 8px;
   }
-  .contract:first-of-type {
-    border-top: none;
-    padding-top: 6px;
+  .inst-head {
+    margin-top: 48px;
   }
-  .contract-head {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    align-items: flex-start;
+  .inst-title {
+    font-family: var(--serif-display);
+    font-weight: 800;
+    font-size: 36px;
+    line-height: 1.15;
+    margin: 22px 0 0;
+    max-width: 900px;
   }
-  .head-main {
+  .parties {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 24px;
+    border-top: 1px solid var(--rule);
+  }
+  .parties > div {
+    padding: 14px 26px 12px 0;
     min-width: 0;
   }
-  .title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--ink);
-    letter-spacing: -0.01em;
+  .parties > div + div {
+    border-left: 1px solid var(--rule);
+    padding-left: 26px;
   }
-  .meta {
-    margin-top: 3px;
-    font-size: 12.5px;
-    color: var(--secondary);
-    word-break: break-word;
-  }
-  .total-wrap {
-    text-align: right;
-    flex: none;
-  }
-  .total {
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--ink);
-    font-variant-numeric: tabular-nums;
-  }
-  .total-cap {
-    font-size: 11px;
-    color: var(--muted);
+  .parties .who {
+    font-family: var(--mono);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.18em;
+    font-size: 11.5px;
+    color: var(--faint);
+  }
+  .parties .addr {
+    font-size: 14.5px;
+    color: var(--ink-soft);
+    margin-top: 5px;
+    word-break: break-all;
+  }
+  .amount-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 20px;
+    margin-top: 6px;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule-dark);
+    padding: 14px 0 12px;
+  }
+  .amount-row .lab {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .amount-row .amt {
+    font-family: var(--serif-display);
+    font-weight: 800;
+    font-size: 38px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  @media (max-width: 720px) {
+    .inst-title {
+      font-size: 28px;
+    }
+    .parties {
+      grid-template-columns: 1fr;
+    }
+    .parties > div + div {
+      border-left: none;
+      padding-left: 0;
+    }
+    .amount-row .amt {
+      font-size: 30px;
+    }
   }
 </style>

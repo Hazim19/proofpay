@@ -1,113 +1,180 @@
 <script lang="ts">
   import type { Milestone } from "../lib/types.ts";
-  import { money } from "../lib/format.ts";
+  import { longDate, money } from "../lib/format.ts";
 
-  let { milestone }: { milestone: Milestone } = $props();
+  let { milestone, index }: { milestone: Milestone; index: number } = $props();
   const v = $derived(milestone.verification!);
   const pct = $derived(Math.round(v.releaseFraction * 100));
   const amount = $derived(Number(milestone.amount) || 0);
-  const toFreelancer = $derived(v.releaseFraction * amount);
-  const refunded = $derived(amount - toFreelancer);
+  const cur = $derived(milestone.currency || "USD");
+  const released = $derived(milestone.status === "released");
+
+  /* Settlement follows the verdict exactly. A failed examination moves
+     nothing: the earned share is 0 and the whole sum stays held, pending
+     revision — it is not silently refunded. */
+  const toFreelancer = $derived(
+    v.overall === "fail" ? 0 : v.releaseFraction * amount,
+  );
+  const refunded = $derived(
+    v.overall === "fail" ? 0 : amount - toFreelancer,
+  );
+  const retained = $derived(amount - toFreelancer - refunded);
+
+  const stampTop = $derived(
+    v.overall === "pass"
+      ? "AI Verified"
+      : v.overall === "partial"
+        ? "AI Verified · Partial"
+        : "Not Verified",
+  );
 </script>
 
-<div class="verdict-panel">
-  <div>
-    <div class="vp-kicker">AI verification · {v.overall}</div>
-    <div class="vp-pct">{pct}<span>%</span></div>
-    <div class="vp-sub">
-      release fraction · verifier <span class="mono">{v.verifier}</span> · checked
-      {String(v.checkedAt || "").slice(0, 10)}
+<div class="verdict">
+  <div class="stamp-cell">
+    <div class="stamp {v.overall}">
+      <div class="s1">{stampTop}</div>
+      <div class="s2">Release {pct}%</div>
+      <div class="s3">
+        Examined criterion by criterion<br />
+        <span class="mono">verifier {v.verifier}</span><br />
+        {longDate(v.checkedAt)}
+      </div>
     </div>
   </div>
-  <div class="vp-right">
-    <div class="vp-row">
-      <span>To freelancer</span><b class="to-free">{money(toFreelancer, milestone.currency)}</b>
+
+  <div class="settle">
+    <h4>Settlement of Milestone {index + 1} — {money(amount, cur)} authorised &amp; held</h4>
+    <div class="row total">
+      <div class="k">
+        {released ? "Paid" : "Payable"} to the freelancer
+        <i>— the earned {pct}%</i>
+      </div>
+      <div class="v">{money(toFreelancer, cur)}</div>
     </div>
-    <div class="vp-row">
-      <span>Refunded to client</span><b>{money(refunded, milestone.currency)}</b>
+    <div class="row refund">
+      <div class="k">
+        {released ? "Returned" : "To be returned"} to the client
+        <i>— the unearned {100 - pct}%</i>
+      </div>
+      <div class="v">{money(refunded, cur)}</div>
     </div>
-    <div class="vp-bar"><div style="width:{pct}%"></div></div>
-    <div class="vp-note">
-      Of {money(amount, milestone.currency)} authorised and held. Payment follows
-      the verdict exactly — earned share out, the rest back.
+    <div class="row">
+      <div class="k">Retained in escrow</div>
+      <div class="v">{money(retained, cur)}</div>
     </div>
+    <p class="settle-note">
+      Payment follows the verdict exactly: the share that was proven moves,
+      the share that was not returns.
+    </p>
   </div>
 </div>
 
 <style>
-  .verdict-panel {
-    margin-top: 14px;
-    background: linear-gradient(120deg, #17103a, #241b52 55%, #101828);
-    border-radius: 16px;
-    padding: 18px 22px;
+  .verdict {
     display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 8px 34px;
-    align-items: center;
-    color: #eae7ff;
+    grid-template-columns: 470px 1fr;
+    gap: 64px;
+    margin-top: 44px;
+    border-top: 2px solid var(--ink);
+    padding-top: 34px;
   }
-  .vp-kicker {
-    font-size: 11px;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    color: #bdb4ff;
+  .stamp {
+    border: 3px double var(--stamp);
+    color: var(--stamp);
+    padding: 24px 28px 20px;
+    transform: rotate(-3.5deg);
+    text-align: center;
+    max-width: 440px;
+    background: rgba(154, 59, 38, 0.03);
+  }
+  .stamp.pass {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(30, 86, 49, 0.03);
+  }
+  .stamp.fail {
+    border-color: var(--red);
+    color: var(--red);
+    background: rgba(179, 38, 30, 0.03);
+  }
+  .stamp .s1 {
+    font-family: var(--mono);
     font-weight: 600;
+    letter-spacing: 0.28em;
+    font-size: 14.5px;
+    text-transform: uppercase;
   }
-  .vp-pct {
-    font-size: 44px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
+  .stamp .s2 {
+    font-family: var(--serif-display);
+    font-weight: 900;
+    font-size: 58px;
     line-height: 1.05;
-    color: #fff;
+    margin-top: 6px;
     font-variant-numeric: tabular-nums;
   }
-  .vp-pct span {
-    font-size: 22px;
-    color: #bdb4ff;
-    font-weight: 600;
+  .stamp .s3 {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: 0.1em;
+    margin-top: 8px;
+    line-height: 1.7;
   }
-  .vp-sub {
+  .stamp .s3 .mono {
+    letter-spacing: 0;
+  }
+  .settle h4 {
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
     font-size: 12px;
-    color: #a79dff;
+    color: var(--faint);
+    font-weight: 500;
+    margin: 0 0 8px;
   }
-  .vp-right {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    min-width: 240px;
-  }
-  .vp-row {
+  .settle .row {
     display: flex;
     justify-content: space-between;
-    font-size: 13.5px;
-    color: #cfc9ff;
+    align-items: baseline;
+    gap: 18px;
+    padding: 13px 0 11px;
+    border-bottom: 1px solid var(--rule);
   }
-  .vp-row b {
-    color: #fff;
+  .settle .row .k {
+    font-size: 19px;
+  }
+  .settle .row .k i {
+    color: var(--faint);
+    font-size: 16px;
+  }
+  .settle .row .v {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
-  .vp-row b.to-free {
-    color: #6ce9a6;
+  .settle .row.total {
+    border-bottom: 2px solid var(--ink);
   }
-  .vp-bar {
-    height: 8px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.14);
-    overflow: hidden;
+  .settle .row.total .v {
+    color: var(--green);
   }
-  .vp-bar div {
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--accent), #12b76a);
+  .settle .row.refund .v {
+    color: var(--stamp);
   }
-  .vp-note {
-    font-size: 12px;
-    color: #a79dff;
-    line-height: 1.45;
+  .settle-note {
+    margin: 14px 0 0;
+    font-style: italic;
+    color: var(--faint);
+    font-size: 16px;
   }
-  @media (max-width: 720px) {
-    .verdict-panel {
+  @media (max-width: 1020px) {
+    .verdict {
       grid-template-columns: 1fr;
+      gap: 30px;
+    }
+    .stamp {
+      transform: rotate(-2deg);
     }
   }
 </style>
