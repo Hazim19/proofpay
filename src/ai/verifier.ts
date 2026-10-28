@@ -69,33 +69,81 @@ function isConcreteEvidence(evidence: string, criterionLabel: string): boolean {
  * Anything else — invented quotes, paraphrases, quotes planted by prompt
  * injection that do not come from the deliverable — does not match.
  */
+/** Function words that carry no evidentiary content on their own. */
+const STOPWORDS = new Set([
+  "a", "an", "the", "and", "or", "of", "to", "in", "on", "for", "with",
+  "as", "at", "by", "from", "is", "are", "was", "were", "be", "been",
+  "it", "its", "this", "that", "these", "those", "all", "any", "every",
+  "how", "what", "when", "where", "which", "who", "will", "would", "can",
+  "could", "has", "have", "had", "not", "no", "yes", "so", "if", "then",
+  "than", "into", "over", "under", "per", "via",
+]);
+
 export function evidenceMatchesDeliverable(
   evidence: string,
   deliverableContent: string,
 ): boolean {
   const normalize = (s: string) =>
-    s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+    s
+      // Re-audit F1.4: fold accents/diacritics identically on both
+      // sides (NFKD + strip combining marks) so the verdict no longer
+      // depends on which Unicode encoding a quote happens to use.
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   const ev = normalize(evidence);
   const del = normalize(deliverableContent);
   if (ev.length < 12 || !del) return false;
-  if (del.includes(ev)) return true;
   const evWords = ev.split(" ");
-  const delWords = del.split(" ");
+  // Re-audit hardening (2026-10-28): evidence made only of function
+  // words ("the and the and the and") is not evidence, even when that
+  // word salad literally appears in the deliverable — a pure-stopword
+  // run otherwise satisfied the fuzzy rule below. Real cited evidence
+  // always names things: require at least two content words.
+  const contentWords = evWords.filter((w) => !STOPWORDS.has(w));
+  if (contentWords.length < 2) return false;
+  // Re-audit F1.2: the word floor guards BOTH branches — a 1–3 word
+  // "quote" (a bare feature name) is satisfied by any passing mention
+  // in the deliverable, including negated or planned ones.
   if (evWords.length < 4) return false;
+  if (del.includes(ev)) return true;
+  const delWords = del.split(" ");
+  // Re-audit F1.3: the fuzzy scan is O(evidence × deliverable × run);
+  // cap the evidence length it will process so a model emitting a
+  // several-hundred-word "quote" cannot stall the event loop.
+  // (Verbatim long quotes still pass via the substring branch above.)
+  if (evWords.length > 48) return false;
   // Longest contiguous run of evidence words present in the deliverable.
+  // Re-audit F1.1: the run must ANCHOR the evidence — the words outside
+  // the run (head + tail together) may total at most ONE word. The
+  // previous >=60% rule let the model invent up to 40% of the cited
+  // evidence at the ends, which is exactly where the criterion-relevant
+  // payload sits ("…with realtime websocket notifications"). One word
+  // of slack tolerates a trimmed article or a mangled edge word; the
+  // semantic payload of a feature claim needs more room than that.
+  // The qualifying run must also contain a content word, so fabricated
+  // content cannot ride on a long stopword run.
   let best = 0;
   for (let i = 0; i < evWords.length; i++) {
+    // Head slack: a run starting later than index 1 can never qualify.
+    if (i > 1) break;
     for (let j = 0; j < delWords.length; j++) {
       if (evWords[i] !== delWords[j]) continue;
       let run = 0;
+      let runHasContent = false;
       while (
         i + run < evWords.length &&
         j + run < delWords.length &&
         evWords[i + run] === delWords[j + run]
       ) {
+        if (!STOPWORDS.has(evWords[i + run])) runHasContent = true;
         run++;
       }
-      if (run > best) best = run;
+      const tailSlack = evWords.length - (i + run);
+      if (runHasContent && i + tailSlack <= 1 && run > best) best = run;
     }
   }
   return best >= 4 && best / evWords.length >= 0.6;

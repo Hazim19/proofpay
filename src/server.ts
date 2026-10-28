@@ -26,10 +26,17 @@ const app = Fastify({
   // Strict JSON typing: without this, ajv coerces "100" into 100 before
   // the service layer can reject a string amount (audit S-3).
   ajv: { customOptions: { coerceTypes: false } },
-  // Behind the Cloudflare tunnel every request arrives from 127.0.0.1;
-  // trustProxy makes req.ip the real client IP (X-Forwarded-For), which
-  // the rate limiter keys on.
-  trustProxy: true,
+  // Behind the Cloudflare tunnel every request arrives from 127.0.0.1
+  // (cloudflared is the only proxy, and it is local). Trust ONLY the
+  // loopback hop: req.ip then resolves to the rightmost untrusted entry
+  // of the forwarded chain — the visitor IP as seen by Cloudflare —
+  // instead of the leftmost entry, which is visitor-controlled. With the
+  // previous trustProxy:true, any internet client could spoof
+  // X-Forwarded-For and rotate their rate-limit identity at will
+  // (re-audit finding, 2026-10-28: forged XFF values were observed
+  // becoming req.ip through the public tunnel). The rate limiter keys
+  // on req.ip.
+  trustProxy: ["127.0.0.1", "::1"],
   // Audit S-4: explicit body cap (field-level caps live in the routes).
   bodyLimit: 256 * 1024,
   logger: {

@@ -260,6 +260,10 @@ export function registerRoutes(
    */
   app.get<{ Querystring: { contractId?: string; milestoneId?: string } }>(
     "/fund/return",
+    // Re-audit F5.2: this browser return point drives PayPal calls
+    // (getOrder/authorize) off unauthenticated query params — give it a
+    // bucket of its own instead of only the global safety net.
+    { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } },
     async (req, reply) => {
       const { contractId, milestoneId } = req.query;
       try {
@@ -318,6 +322,8 @@ export function registerRoutes(
   // ---------------------------------------------------------------- ledger
   app.get<{ Querystring: { contractId?: string } }>(
     "/api/events",
+    // Re-audit F5.2: the full-ledger dump grows unboundedly; bucket it.
+    { config: { rateLimit: { max: 120, timeWindow: "1 minute" } } },
     async (req) => ({ events: escrow.listEvents(req.query.contractId) }),
   );
 

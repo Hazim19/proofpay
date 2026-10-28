@@ -128,7 +128,9 @@ export function setupTokenRequired(): boolean {
 export function checkSetupToken(input: { header?: string }): boolean {
   const expected = process.env.PROOFPAY_SETUP_TOKEN?.trim();
   if (!expected) return false; // fail closed
-  const provided = input.header ?? "";
+  // Re-audit F7.3: a duplicated header can arrive as a non-string at
+  // runtime despite the type — never let the gate throw (500); deny.
+  const provided = typeof input.header === "string" ? input.header : "";
   // Constant-time comparison (audit R-1): hash both sides so the compare
   // itself is length-independent, then timingSafeEqual.
   const a = createHash("sha256").update(provided).digest();
@@ -143,12 +145,35 @@ export function checkSetupToken(input: { header?: string }): boolean {
  * AI API key to an internal target (SSRF / credential exfiltration).
  */
 export function isPrivateOrLoopbackHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  // Re-audit F7.1: strip a trailing dot ("localhost." resolves to
+  // loopback but slipped past the exact-match checks).
+  const host = hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "");
   if (host === "localhost" || host.endsWith(".localhost")) return true;
   if (host === "::1" || host === "::") return true;
   if (host.startsWith("fe80:")) return true; // IPv6 link-local
   if (/^f[cd][0-9a-f]{2}:/.test(host)) return true; // IPv6 unique-local fc00::/7
-  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  // IPv4-mapped IPv6 ("::ffff:7f00:1" is the canonical form of
+  // ::ffff:127.0.0.1): extract the embedded IPv4 and check it below.
+  let v4Candidate = host;
+  if (host.startsWith("::ffff:")) {
+    const rest = host.slice("::ffff:".length);
+    if (rest.includes(".")) {
+      v4Candidate = rest;
+    } else {
+      const groups = rest.split(":");
+      if (groups.length === 2) {
+        const hi = parseInt(groups[0], 16);
+        const lo = parseInt(groups[1], 16);
+        if (Number.isFinite(hi) && Number.isFinite(lo)) {
+          v4Candidate = `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+        }
+      }
+    }
+  }
+  const v4 = v4Candidate.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (v4) {
     const [a, b] = [Number(v4[1]), Number(v4[2])];
     if (a === 127 || a === 10 || a === 0) return true;

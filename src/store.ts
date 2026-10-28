@@ -34,6 +34,14 @@ export class JsonStore {
     this.db = this.load();
   }
 
+  /** Minimal shape check (re-audit F4.4): parseable-but-wrong JSON is
+   * treated as corruption, so the .bak fallback covers it too. */
+  private static isDb(value: unknown): value is Db {
+    if (typeof value !== "object" || value === null) return false;
+    const v = value as { contracts?: unknown; events?: unknown };
+    return Array.isArray(v.contracts) && Array.isArray(v.events);
+  }
+
   private load(): Db {
     if (!existsSync(this.file)) {
       const empty: Db = { contracts: [], events: [] };
@@ -42,15 +50,32 @@ export class JsonStore {
       return empty;
     }
     try {
-      return JSON.parse(readFileSync(this.file, "utf8")) as Db;
+      const parsed: unknown = JSON.parse(readFileSync(this.file, "utf8"));
+      if (!JsonStore.isDb(parsed)) {
+        throw new Error("db file does not have the expected shape");
+      }
+      return parsed;
     } catch (mainErr) {
       const bak = `${this.file}.bak`;
       if (existsSync(bak)) {
         try {
-          const recovered = JSON.parse(readFileSync(bak, "utf8")) as Db;
+          const recovered: unknown = JSON.parse(readFileSync(bak, "utf8"));
+          if (!JsonStore.isDb(recovered)) {
+            throw new Error("backup does not have the expected shape");
+          }
           console.error(
             `JsonStore: ${this.file} is unreadable (${mainErr instanceof Error ? mainErr.message : mainErr}); recovered last good state from ${bak}`,
           );
+          // Re-audit F4.1: heal the main file from the backup NOW.
+          // Without this, the next persist() would copy the corrupt
+          // main over the only good backup before writing, voiding the
+          // protection in exactly the scenario it exists for.
+          try {
+            copyFileSync(bak, this.file);
+            chmodSync(this.file, 0o600);
+          } catch {
+            /* healing is best-effort; the recovered state is in memory */
+          }
           return recovered;
         } catch {
           /* fall through to the throw below */

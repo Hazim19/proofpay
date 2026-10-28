@@ -403,6 +403,27 @@ export class PayPalClient {
     return { captureId: raw.id, status: raw.status, raw };
   }
 
+  /**
+   * Fetch a capture's current status (re-audit F3.1): the release resume
+   * path re-examines an existing capture before settling on it, instead
+   * of trusting the status seen by whichever attempt created it.
+   */
+  async getCapture(captureId: string): Promise<CaptureResult> {
+    this.refreshConfig();
+    if (this.config.mode === "mock") {
+      return {
+        captureId,
+        status: "COMPLETED",
+        mock: true,
+        raw: { note: "deterministic mock capture lookup" },
+      };
+    }
+    const raw = await this.api<{ id: string; status: string }>(
+      `/v2/payments/captures/${captureId}`,
+    );
+    return { captureId: raw.id, status: raw.status, raw };
+  }
+
   /** Refund a capture (full refund when amount is omitted). */
   async refundCapture(input: {
     captureId: string;

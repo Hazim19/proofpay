@@ -68,12 +68,18 @@ export class EscrowService {
     const current = new Promise<void>((resolve) => {
       release = resolve;
     });
-    this.locks.set(milestoneId, previous.then(() => current));
+    const tail = previous.then(() => current);
+    this.locks.set(milestoneId, tail);
     await previous;
     try {
       return await fn();
     } finally {
       release();
+      // Re-audit F2.2: evict the chain once it has drained and nobody
+      // has chained onto us, so the map cannot grow without bound.
+      if (this.locks.get(milestoneId) === tail) {
+        this.locks.delete(milestoneId);
+      }
     }
   }
 
@@ -227,13 +233,21 @@ export class EscrowService {
     this.assertWritable(contractId);
     const { contract, milestone } = this.find(contractId, milestoneId);
     const m = milestone as Milestone;
-    if (m.status !== "draft") {
+    // Re-audit F2.1: a milestone stranded in "funding" (process died
+    // after the claim was persisted but before the order result was)
+    // resumes here instead of being stuck forever: createOrder carries
+    // the deterministic PayPal-Request-Id `${mid}-order` (and the mock
+    // id is a deterministic hash), so re-presenting the same creation
+    // returns the existing order rather than duplicating it.
+    if (m.status !== "draft" && m.status !== "funding") {
       throw httpError(409, `milestone is ${m.status}, expected draft`);
     }
     // Audit T-7: claim the milestone synchronously (and persist) BEFORE
     // the first await, so a concurrent fund cannot create a second order.
-    m.status = "funding";
-    this.store.save();
+    if (m.status === "draft") {
+      m.status = "funding";
+      this.store.save();
+    }
     let order;
     try {
       order = await this.paypal.createOrder({
@@ -297,7 +311,11 @@ export class EscrowService {
       const m = milestone as Milestone;
       if (m.status === "funded") return m;
       if (this.paypal.mode === "mock") {
-        if (m.status === "draft" || m.status === "awaiting_approval") {
+        if (
+          m.status === "draft" ||
+          m.status === "awaiting_approval" ||
+          m.status === "funding"
+        ) {
           m.status = "draft";
           return this.fundMilestoneLocked(contractId, milestoneId);
         }
@@ -314,6 +332,15 @@ export class EscrowService {
       }
       const order = await this.paypal.getOrder(m.paypalOrderId);
       const existing = order.authorizations[0];
+      if (existing && existing.status !== "CREATED") {
+        // Re-audit F3.4: never adopt a dead authorization (VOIDED,
+        // DENIED, EXPIRED, already CAPTURED) as "funded" — the milestone
+        // would pass submit/verify and then fail at capture forever.
+        throw httpError(
+          409,
+          `PayPal order ${m.paypalOrderId} has an authorization in status ${existing.status}; it cannot be adopted as held funds`,
+        );
+      }
       if (existing) {
         // T-9 adoption path: the money is already held; just record it.
         m.paypalAuthorizationId = existing.id;
@@ -562,6 +589,18 @@ export class EscrowService {
             `PayPal capture ${captureId} is ${capture.status}, not COMPLETED; settlement paused and can be retried`,
           );
         }
+      } else {
+        // Re-audit F3.1: on a RESUMED release, re-examine the existing
+        // capture's live status instead of trusting the status seen by
+        // the attempt that created it (a capture left PENDING by a
+        // paused attempt must not be settled on blind).
+        const capture = await this.paypal.getCapture(captureId);
+        if (capture.status !== "COMPLETED") {
+          throw httpError(
+            502,
+            `PayPal capture ${captureId} is ${capture.status}, not COMPLETED; settlement paused and can be retried`,
+          );
+        }
       }
 
       if (remainder > 0 && !m.paypalRefundId) {
@@ -588,9 +627,11 @@ export class EscrowService {
         // A previous attempt created the batch; refresh its state instead
         // of paying again.
         const batch = await this.paypal.getPayoutBatch(m.paypalPayoutBatchId);
-        if (batch.batchStatus === "DENIED") {
+        if (batch.batchStatus === "DENIED" || batch.batchStatus === "CANCELED") {
+          // Re-audit F3.3: a CANCELED batch moved no money either; it
+          // must not be recorded as paid.
           return this.markSettlementFailed(contract, m,
-            `PayPal payout batch ${m.paypalPayoutBatchId} was DENIED`);
+            `PayPal payout batch ${m.paypalPayoutBatchId} was ${batch.batchStatus}`);
         }
         m.status = "released";
         m.settlementError = undefined;
@@ -620,19 +661,28 @@ export class EscrowService {
         const message = err instanceof Error ? err.message : String(err);
         const statusMatch = message.match(/failed: (\d{3})\b/);
         const status = statusMatch ? Number(statusMatch[1]) : null;
-        // A 4xx from the Payouts API is a permanent rejection (bad
-        // receiver, invalid request): park the milestone in the terminal
-        // settlement_failed state. Anything else (5xx, network) stays
-        // resumable in "releasing".
-        if (status !== null && status >= 400 && status < 500) {
+        // A 4xx from the Payouts API is normally a permanent rejection
+        // (bad receiver, invalid request): park the milestone in the
+        // terminal settlement_failed state. Re-audit F3.2: 401/403
+        // (expired token / fixable credentials) and 429 (rate limit)
+        // are NOT permanent — they stay resumable in "releasing", as do
+        // 5xx and network errors.
+        if (
+          status !== null &&
+          status >= 400 &&
+          status < 500 &&
+          status !== 401 &&
+          status !== 403 &&
+          status !== 429
+        ) {
           return this.markSettlementFailed(contract, m, message);
         }
         throw err;
       }
       m.paypalPayoutBatchId = payout.payoutBatchId;
-      if (payout.batchStatus === "DENIED") {
+      if (payout.batchStatus === "DENIED" || payout.batchStatus === "CANCELED") {
         return this.markSettlementFailed(contract, m,
-          `PayPal payout batch ${payout.payoutBatchId} was DENIED`);
+          `PayPal payout batch ${payout.payoutBatchId} was ${payout.batchStatus}`);
       }
       m.status = "released";
       this.store.save();
@@ -659,11 +709,21 @@ export class EscrowService {
     m: Milestone,
     error: string,
   ) {
+    // Re-audit F6.2: the milestone (and therefore settlementError) is
+    // served by the public contract API — never persist raw upstream
+    // error text there. Batch-status messages are our own strings and
+    // are safe to keep; HTTP failures collapse to their status code.
+    const statusMatch = error.match(/failed: (\d{3})\b/);
+    const publicError = error.startsWith("PayPal payout batch")
+      ? error
+      : statusMatch
+        ? `payout failed permanently (PayPal HTTP ${statusMatch[1]}); the captured funds are accounted for in the ledger`
+        : "payout failed permanently; the captured funds are accounted for in the ledger";
     m.status = "settlement_failed";
-    m.settlementError = error;
+    m.settlementError = publicError;
     this.store.save();
     this.log(contract.id, "settlement_failed", {
-      error,
+      error: publicError,
       capturedAmount: m.amount,
       currency: m.currency,
       captureId: m.paypalCaptureId ?? null,
@@ -672,7 +732,7 @@ export class EscrowService {
       payoutAttempted: m.payoutAttempted ?? false,
       intendedFreelancerEmail: contract.freelancerEmail,
     }, m.id);
-    return { released: false, settlementFailed: true, error, milestone: m };
+    return { released: false, settlementFailed: true, error: publicError, milestone: m };
   }
 
   // ---------------------------------------------------------------- events
