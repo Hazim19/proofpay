@@ -124,7 +124,17 @@ export class EscrowService {
   }
 
   // ------------------------------------------------------------------ fund
-  /** Client funds a milestone: create PayPal order (AUTHORIZE) + authorize. */
+  /**
+   * Client starts funding a milestone: create the PayPal order (AUTHORIZE).
+   *
+   * Mock mode: authorize immediately (the offline flow is unchanged) and
+   * the milestone lands in "funded".
+   *
+   * Live mode: a real order cannot be authorized until the payer approves
+   * it in PayPal Checkout, so the milestone stops at "awaiting_approval"
+   * with the approval URL attached; confirmFunding() finishes the job once
+   * PayPal reports the order APPROVED.
+   */
   async fundMilestone(contractId: string, milestoneId: string) {
     const { contract, milestone } = this.find(contractId, milestoneId);
     const m = milestone as Milestone;
@@ -136,14 +146,80 @@ export class EscrowService {
       currency: m.currency,
       referenceId: m.id,
       description: `ProofPay escrow: ${contract.title} / ${m.title}`,
+      fundingContext: { contractId: contract.id, milestoneId: m.id },
     });
-    const auth = await this.paypal.authorizeOrder(order.id);
     m.paypalOrderId = order.id;
+    if (this.paypal.mode === "mock") {
+      const auth = await this.paypal.authorizeOrder(order.id);
+      m.paypalAuthorizationId = auth.authorizationId;
+      m.status = "funded";
+      this.store.save();
+      this.log(contract.id, "milestone_funded", {
+        orderId: order.id,
+        authorizationId: auth.authorizationId,
+        amount: m.amount,
+        currency: m.currency,
+        paypalMode: this.paypal.mode,
+      }, m.id);
+      return m;
+    }
+    m.approvalUrl = order.approvalUrl;
+    m.status = "awaiting_approval";
+    this.store.save();
+    this.log(contract.id, "order_created", {
+      orderId: order.id,
+      amount: m.amount,
+      currency: m.currency,
+      paypalMode: this.paypal.mode,
+    }, m.id);
+    return m;
+  }
+
+  /**
+   * Finish funding after the client returns from PayPal Checkout (live
+   * mode): if the order is APPROVED, authorize it so the funds are held
+   * and the milestone becomes "funded". Idempotent — an already-funded
+   * milestone is returned unchanged. A not-yet-approved order is a 409,
+   * not an error: the client simply has not finished approving.
+   *
+   * Mock mode: behaves like the old instant fund for a milestone that is
+   * still draft/awaiting (the mock fund path is already instant, so this
+   * only matters for a confirm call on an unfunded milestone).
+   */
+  async confirmFunding(contractId: string, milestoneId: string) {
+    const { contract, milestone } = this.find(contractId, milestoneId);
+    const m = milestone as Milestone;
+    if (m.status === "funded") return m;
+    if (this.paypal.mode === "mock") {
+      if (m.status === "draft" || m.status === "awaiting_approval") {
+        m.status = "draft";
+        return this.fundMilestone(contractId, milestoneId);
+      }
+      throw httpError(
+        409,
+        `milestone is ${m.status}, expected awaiting_approval`,
+      );
+    }
+    if (m.status !== "awaiting_approval" || !m.paypalOrderId) {
+      throw httpError(
+        409,
+        `milestone is ${m.status}, expected awaiting_approval`,
+      );
+    }
+    const order = await this.paypal.getOrder(m.paypalOrderId);
+    if (order.status !== "APPROVED") {
+      throw httpError(
+        409,
+        `PayPal order ${m.paypalOrderId} is ${order.status}; the client has not approved the payment yet`,
+      );
+    }
+    const auth = await this.paypal.authorizeOrder(m.paypalOrderId);
     m.paypalAuthorizationId = auth.authorizationId;
+    m.approvalUrl = undefined;
     m.status = "funded";
     this.store.save();
-    this.log(contract.id, "milestone_funded", {
-      orderId: order.id,
+    this.log(contract.id, "funding_authorized", {
+      orderId: m.paypalOrderId,
       authorizationId: auth.authorizationId,
       amount: m.amount,
       currency: m.currency,
@@ -242,21 +318,27 @@ export class EscrowService {
     const releaseAmount = round2(m.amount * fraction);
     const remainder = round2(m.amount - releaseAmount);
 
-    const capture = await this.paypal.captureAuthorization({
-      authorizationId: m.paypalAuthorizationId,
-      currency: m.currency,
-      finalCapture: true,
-    });
-    m.paypalCaptureId = capture.captureId;
-    this.log(contract.id, "captured", {
-      captureId: capture.captureId,
-      amount: m.amount,
-      currency: m.currency,
-    }, m.id);
+    // Resumable: a previous attempt may already have captured (and refunded)
+    // before a later step failed; never capture or refund twice.
+    let captureId = m.paypalCaptureId;
+    if (!captureId) {
+      const capture = await this.paypal.captureAuthorization({
+        authorizationId: m.paypalAuthorizationId,
+        currency: m.currency,
+        finalCapture: true,
+      });
+      captureId = capture.captureId;
+      m.paypalCaptureId = captureId;
+      this.log(contract.id, "captured", {
+        captureId,
+        amount: m.amount,
+        currency: m.currency,
+      }, m.id);
+    }
 
-    if (remainder > 0) {
+    if (remainder > 0 && !m.paypalRefundId) {
       const refund = await this.paypal.refundCapture({
-        captureId: capture.captureId,
+        captureId,
         amount: remainder,
         currency: m.currency,
         note: "ProofPay: unreleased portion returned after partial verification",

@@ -47,7 +47,11 @@ work that was never checked.
    weights that sum to 1.
 2. **Fund** — the client approves the contract and funds the milestone
    through PayPal Checkout (Orders v2, `AUTHORIZE` intent). The money is
-   held, not yet the freelancer's and no longer freely the client's.
+   held, not yet the freelancer's and no longer freely the client's. In
+   live mode this is a real two-step: ProofPay creates the order, the
+   client is redirected to PayPal to approve it, and ProofPay authorizes
+   the hold only once PayPal reports the order approved (mock mode funds
+   instantly).
 3. **Deliver** — the freelancer submits the work (text, link, or file
    reference) on the milestone page.
 4. **Verify** — the verifier grades the deliverable criterion by criterion:
@@ -209,7 +213,9 @@ export AI_MODEL=gpt-4o-mini                    # any model on that host
 | POST | `/api/contracts` | Create a contract from a brief (AI drafter; stub fallback offline) |
 | GET | `/api/contracts` | List contracts |
 | GET | `/api/contracts/:id` | Get one contract |
-| POST | `/api/contracts/:id/milestones/:mid/fund` | Create PayPal order (AUTHORIZE) + authorize — money held |
+| POST | `/api/contracts/:id/milestones/:mid/fund` | Create PayPal order (AUTHORIZE); live mode returns an approval URL and stops at `awaiting_approval`, mock mode authorizes instantly |
+| POST | `/api/contracts/:id/milestones/:mid/confirm-fund` | After the client approves in PayPal Checkout: authorize the order — money held (idempotent) |
+| GET | `/fund/return`, `/fund/cancel` | PayPal Checkout return points; confirm funding and 302 back to the demo page |
 | POST | `/api/contracts/:id/milestones/:mid/submit` | Freelancer submits a deliverable `{ kind, content }` |
 | POST | `/api/contracts/:id/milestones/:mid/verify` | Run the verifier (AI; stub fallback offline) — per-criterion report |
 | POST | `/api/contracts/:id/milestones/:mid/release` | Capture + refund remainder + payout, per verification |

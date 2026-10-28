@@ -149,6 +149,45 @@ export function registerRoutes(
     }),
   );
 
+  app.post<{ Params: { id: string; mid: string } }>(
+    "/api/contracts/:id/milestones/:mid/confirm-fund",
+    async (req) => ({
+      milestone: await escrow.confirmFunding(req.params.id, req.params.mid),
+    }),
+  );
+
+  // --------------------------------------- PayPal Checkout return points
+  /**
+   * Browser-facing return URLs baked into live PayPal orders. The client
+   * lands here after approving (or cancelling) in PayPal Checkout; PayPal
+   * preserves our contractId/milestoneId query params and appends its own
+   * (token = order id, PayerID). These handlers must never 500 a browser
+   * tab: every outcome becomes a 302 back to the demo page with a status
+   * flag in the query string.
+   */
+  app.get<{ Querystring: { contractId?: string; milestoneId?: string } }>(
+    "/fund/return",
+    async (req, reply) => {
+      const { contractId, milestoneId } = req.query;
+      try {
+        if (!contractId || !milestoneId) {
+          throw new Error("missing contractId or milestoneId");
+        }
+        await escrow.confirmFunding(contractId, milestoneId);
+        return reply.redirect(`/?funded=${encodeURIComponent(milestoneId)}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return reply.redirect(
+          `/?funding_error=${encodeURIComponent(message)}`,
+        );
+      }
+    },
+  );
+
+  app.get("/fund/cancel", async (_req, reply) => {
+    return reply.redirect("/?funding_cancelled=1");
+  });
+
   app.post<{ Params: { id: string; mid: string }; Body: SubmitBody }>(
     "/api/contracts/:id/milestones/:mid/submit",
     async (req) => ({

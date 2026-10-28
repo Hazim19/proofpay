@@ -4,6 +4,7 @@ export type CriterionStatus = "pass" | "partial" | "fail";
 
 export type MilestoneStatus =
   | "draft" // created, not yet funded
+  | "awaiting_approval" // live mode: PayPal order created, waiting for the client to approve it in PayPal Checkout
   | "funded" // money authorized (held) via PayPal
   | "submitted" // freelancer delivered work
   | "released" // verified funds captured + paid out
@@ -50,6 +51,8 @@ export interface Milestone {
   criteria: Criterion[];
   // PayPal linkage (ids only, never credentials)
   paypalOrderId?: string;
+  /** Live mode only: payer approval URL in PayPal Checkout, set while awaiting_approval. */
+  approvalUrl?: string;
   paypalAuthorizationId?: string;
   paypalCaptureId?: string;
   paypalRefundId?: string;

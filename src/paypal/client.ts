@@ -52,6 +52,18 @@ const BASE_URLS: Record<PayPalConfig["env"], string> = {
   live: "https://api-m.paypal.com",
 };
 
+export const DEFAULT_PUBLIC_BASE_URL = "https://proofpay.onedash.web.id";
+
+/**
+ * The app's own public base URL, used for the PayPal Checkout return/cancel
+ * URLs. Resolved via the settings funnel (PUBLIC_BASE_URL env var or the
+ * /connect secrets file); falls back to the hosted demo origin.
+ */
+export function publicBaseUrl(): string {
+  const configured = resolveSetting("PUBLIC_BASE_URL");
+  return (configured ?? DEFAULT_PUBLIC_BASE_URL).replace(/\/+$/, "");
+}
+
 /** Deterministic mock id: stable for a given seed string. */
 function mockId(prefix: string, seed: string): string {
   const hex = createHash("sha256").update(seed).digest("hex");
@@ -66,6 +78,17 @@ export interface OrderResult {
   id: string;
   status: string;
   intent: string;
+  /** Payer approval URL in PayPal Checkout (live mode; deterministic fake in mock mode). */
+  approvalUrl?: string;
+  mock?: boolean;
+  raw: unknown;
+}
+
+export interface OrderDetailsResult {
+  id: string;
+  status: string;
+  /** purchase_units[0].payments.authorizations, when the order has any. */
+  authorizations: Array<{ id: string; status: string }>;
   mock?: boolean;
   raw: unknown;
 }
@@ -200,14 +223,31 @@ export class PayPalClient {
   /**
    * Create an order with intent AUTHORIZE (funds are held, not yet captured).
    * This is the escrow funding step.
+   *
+   * The order carries an application context whose return/cancel URLs point
+   * back at this app (/fund/return, /fund/cancel on the public base URL),
+   * with the funding context (contract + milestone ids) in the query string
+   * so the return handler knows which milestone came back. PayPal preserves
+   * the query string and appends its own `token` (= order id) parameter.
+   *
+   * A real order is only CREATED here: the payer must still approve it in
+   * PayPal Checkout (see the returned `approvalUrl`) before it can be
+   * authorized.
    */
   async createOrder(input: {
     amount: number;
     currency: string;
     referenceId: string;
     description?: string;
+    fundingContext?: { contractId: string; milestoneId: string };
   }): Promise<OrderResult> {
     this.refreshConfig();
+    const base = publicBaseUrl();
+    const ctxQuery = input.fundingContext
+      ? `?contractId=${encodeURIComponent(input.fundingContext.contractId)}&milestoneId=${encodeURIComponent(input.fundingContext.milestoneId)}`
+      : "";
+    const returnUrl = `${base}/fund/return${ctxQuery}`;
+    const cancelUrl = `${base}/fund/cancel${ctxQuery}`;
     if (this.config.mode === "mock") {
       const id = mockId(
         "MOCKORDER",
@@ -217,11 +257,17 @@ export class PayPalClient {
         id,
         status: "CREATED",
         intent: "AUTHORIZE",
+        approvalUrl: `https://sandbox.paypal.com/checkoutnow?token=${id}`,
         mock: true,
         raw: { note: "deterministic mock order (no PayPal account involved)" },
       };
     }
-    const raw = await this.api<Record<string, unknown>>("/v2/checkout/orders", {
+    const raw = await this.api<{
+      id: string;
+      status: string;
+      links?: Array<{ href: string; rel: string }>;
+      [key: string]: unknown;
+    }>("/v2/checkout/orders", {
       method: "POST",
       body: {
         intent: "AUTHORIZE",
@@ -232,12 +278,52 @@ export class PayPalClient {
             amount: money(input.amount, input.currency),
           },
         ],
+        application_context: {
+          return_url: returnUrl,
+          cancel_url: cancelUrl,
+        },
       },
     });
+    const approvalUrl = raw.links?.find(
+      (l) => l.rel === "approve" || l.rel === "payer-action",
+    )?.href;
     return {
       id: String(raw.id),
       status: String(raw.status),
       intent: "AUTHORIZE",
+      approvalUrl,
+      raw,
+    };
+  }
+
+  /**
+   * Fetch an order's current state (live mode). Used after the payer returns
+   * from PayPal Checkout: only an APPROVED order can be authorized.
+   */
+  async getOrder(orderId: string): Promise<OrderDetailsResult> {
+    this.refreshConfig();
+    if (this.config.mode === "mock") {
+      return {
+        id: orderId,
+        status: "APPROVED",
+        authorizations: [],
+        mock: true,
+        raw: { note: "deterministic mock order details" },
+      };
+    }
+    const raw = await this.api<{
+      id: string;
+      status: string;
+      purchase_units?: Array<{
+        payments?: { authorizations?: Array<{ id: string; status: string }> };
+      }>;
+      [key: string]: unknown;
+    }>(`/v2/checkout/orders/${orderId}`);
+    return {
+      id: String(raw.id),
+      status: String(raw.status),
+      authorizations:
+        raw.purchase_units?.[0]?.payments?.authorizations ?? [],
       raw,
     };
   }
@@ -367,7 +453,9 @@ export class PayPalClient {
           {
             recipient_type: "EMAIL",
             receiver: input.email,
-            amount: money(input.amount, input.currency),
+            // The Payouts API names the field "currency"; the Orders-style
+            // "currency_code" from money() is rejected with a 400.
+            amount: { currency: input.currency, value: input.amount.toFixed(2) },
             note: input.note ?? "ProofPay milestone release",
             sender_item_id: input.senderItemId,
           },

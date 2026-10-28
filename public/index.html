@@ -24,6 +24,8 @@
   .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #e8eefc; font-size: 12px; }
   #ledgerGrid { height: 320px; width: 100%; }
   .hint { font-size: 12px; color: #666; }
+  .notice { border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; background: #e6f4ea; border: 1px solid #2e7d32; color: #1b4332; }
+  .notice.error { background: #fdecea; border-color: #c62828; color: #7f1d1d; }
   pre { background: #0d1526; color: #cfe3ff; padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 12px; }
 </style>
 </head>
@@ -33,6 +35,7 @@
   <p>Milestone escrow for freelance work — funds are released only after AI verifies the delivery. (Scaffold build: AI is a deterministic stub, PayPal runs in mock mode until sandbox credentials are set.)</p>
 </header>
 <main>
+  <div id="notice" class="notice" style="display:none"></div>
   <div class="roles">
     <button id="roleClient" class="active" onclick="setRole('client')">I am the Client</button>
     <button id="roleFreelancer" onclick="setRole('freelancer')">I am the Freelancer</button>
@@ -102,6 +105,7 @@ async function api(path, body) {
 
 async function refresh() {
   const health = await (await fetch('/health')).json();
+  window._paypalMode = health.paypalMode;
   document.getElementById('modeInfo').textContent =
     'PayPal: ' + health.paypalMode + ' (' + health.paypalEnv + ')';
   const data = await api('/api/contracts');
@@ -121,10 +125,11 @@ function renderContracts(contracts) {
       ${c.milestones.map(m => `
         <div class="milestone">
           <strong>${m.title}</strong> — ${m.amount} ${m.currency}
-          <span class="badge">${m.status}</span>
+          <span class="badge">${statusLabel(m.status)}</span>
           ${m.verification ? `<span class="badge">verified: ${m.verification.overall} · release ${(m.verification.releaseFraction*100).toFixed(0)}%</span>` : ''}
           <div>
-            ${role === 'client' && m.status === 'draft' ? `<button class="action" onclick="act('${c.id}','${m.id}','fund')">Fund (authorize via PayPal)</button>` : ''}
+            ${role === 'client' && m.status === 'draft' ? `<button class="action" onclick="fundMilestone('${c.id}','${m.id}')">Fund (authorize via PayPal)</button>` : ''}
+            ${role === 'client' && m.status === 'awaiting_approval' ? `<button class="action" onclick="act('${c.id}','${m.id}','confirm-fund')">Confirm funding (after PayPal approval)</button>` : ''}
             ${role === 'freelancer' && (m.status === 'funded' || m.status === 'failed') ? `<button class="action" onclick="submitWork('${c.id}','${m.id}')">Submit deliverable</button>` : ''}
             ${m.status === 'submitted' ? `<button class="action" onclick="act('${c.id}','${m.id}','verify')">Verify with AI</button>` : ''}
             ${role === 'client' && m.verification && m.status !== 'released' ? `<button class="action" onclick="act('${c.id}','${m.id}','release')">Release per verification</button>` : ''}
@@ -157,7 +162,41 @@ async function act(contractId, milestoneId, action) {
   refresh();
 }
 
+const STATUS_LABELS = { awaiting_approval: 'Awaiting client approval' };
+function statusLabel(status) { return STATUS_LABELS[status] || status; }
+
+function showNotice(text, isError) {
+  const el = document.getElementById('notice');
+  el.textContent = text;
+  el.className = 'notice' + (isError ? ' error' : '');
+  el.style.display = '';
+}
+
+/**
+ * Fund a milestone. In live mode the server returns an approvalUrl: the
+ * client must approve the payment in PayPal Checkout, so the browser is
+ * redirected there (PayPal sends it back to /fund/return afterwards). In
+ * mock mode funding is instant and the page simply refreshes.
+ */
+async function fundMilestone(contractId, milestoneId) {
+  const json = await api(`/api/contracts/${contractId}/milestones/${milestoneId}/fund`, {});
+  const m = json.milestone;
+  if (m && m.approvalUrl && window._paypalMode === 'live') {
+    window.location.href = m.approvalUrl;
+    return;
+  }
+  refresh();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('funded')) {
+    showNotice('Funding confirmed: milestone ' + params.get('funded') + ' is funded — the client\u2019s payment is authorized and held in escrow.');
+  } else if (params.get('funding_error')) {
+    showNotice('Funding could not be confirmed: ' + params.get('funding_error'), true);
+  } else if (params.get('funding_cancelled')) {
+    showNotice('Funding was cancelled in PayPal Checkout. No money was held.', true);
+  }
   gridApi = agGrid.createGrid(document.getElementById('ledgerGrid'), {
     columnDefs: [
       { field: 'ts', headerName: 'Time', width: 190 },
