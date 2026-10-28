@@ -9,3 +9,6 @@ dist/
 video/
 VIDEO_SCRIPT.md
 hidden-connect-link.txt
+referensi-ui/*.png
+referensi-ui/*.webp
+frontend/BUILD_DONE
